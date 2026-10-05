@@ -152,7 +152,7 @@ body.resizing * { cursor: col-resize !important; user-select: none !important; }
   width: 28px; height: 28px; border-radius: 4px; display: grid; place-items: center; --wails-draggable: no-drag;
 }
 .rail-btn:hover { background: var(--nav-bg-2); color: #fff; }
-.sidebar.rail { width: 56px; align-items: center; padding-top: 34px; }
+.sidebar.rail { width: 76px; align-items: center; padding-top: 38px; }
 .sidebar.rail .toggle { margin-bottom: 10px; }
 .sidebar.rail .contexts { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 4px; }
 .rail-ctx {
@@ -499,3 +499,22 @@ details summary { cursor: pointer; color: var(--fg-muted); }
 .tile-problem.warn { color: var(--warning-fg); background: var(--warning-bg); }
 .tile-actions { margin-top: auto; display: flex; gap: 6px; }
 .seg.small button { padding: 3px 10px; font-size: 12px; }
+
+/* ---------- logs ---------- */
+.rtree-side { position: relative; }
+.rtree-side.logs-mode { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.side-resizer { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 3; }
+.side-resizer:hover { background: var(--teal); opacity: .6; }
+.logs { flex: 1; display: flex; flex-direction: column; min-height: 0; margin: 0 -16px; position: relative; }
+.logs-bar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; flex-wrap: wrap; }
+.logs-body {
+  flex: 1; overflow: auto; background: #0b141b; color: #d5dee4; padding: 8px 12px; font-size: 11.5px; line-height: 1.5;
+  white-space: pre;
+}
+.logs-body.wrap { white-space: pre-wrap; word-break: break-all; }
+.logline.err { color: #ff8b94; background: rgba(233, 109, 118, .08); }
+.logline.warn { color: #f4d27a; }
+.logline .lt { color: #6b8796; }
+.logline .lp { font-weight: 600; }
+.logs-body .muted-sm { color: #6b8796; }
+.logs-bottom { position: absolute; right: 24px; bottom: 16px; box-shadow: var(--shadow); }

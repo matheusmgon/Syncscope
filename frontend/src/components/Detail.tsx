@@ -112,6 +112,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Pro
           <div className="body tree-body">
             {d ? (
               <ResourceTree
+                appKey={appKey}
                 app={s}
                 nodes={d.tree ?? []}
                 onRestart={(n) => restartOne(store.ResourceRow.createFrom({ group: n.group, version: n.version, kind: n.kind, namespace: n.namespace, name: n.name }))}

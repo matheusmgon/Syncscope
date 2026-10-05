@@ -27,6 +27,9 @@ type ContextStatus struct {
 	Version  string `json:"version,omitempty"`
 	User     string `json:"user,omitempty"`
 	Synced   string `json:"synced,omitempty"` // last successful list
+	// Errors listing secondary objects (usually RBAC); shown in the UI.
+	AppSetsError  string `json:"appSetsError,omitempty"`
+	ClustersError string `json:"clustersError,omitempty"`
 }
 
 type AppSetSummary struct {
@@ -54,6 +57,8 @@ type Manager struct {
 
 	mu    sync.RWMutex
 	conns map[string]*conn
+
+	logs logStreams
 
 	pendMu  sync.Mutex
 	pendUp  map[string]AppSummary

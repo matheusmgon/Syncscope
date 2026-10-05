@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { store } from '../../wailsjs/go/models'
 import { HealthIcon, SyncIcon, ago } from './Status'
+import { LogViewer } from './LogViewer'
 
 // Argo CD-style resource graph: application on the left, owned resources fanning
 // out to the right (Deployment → ReplicaSet → Pod), connected by curved edges.
@@ -36,12 +37,40 @@ const isBad = (n: store.TreeNode) =>
 type Placed = { node: store.TreeNode | null; id: string; x: number; y: number; hidden: number }
 
 type Props = {
+  appKey: string
   app: { name: string; health: string; sync: string; opPhase?: string; syncRev: string }
   nodes: store.TreeNode[]
   onRestart: (n: store.TreeNode) => void
 }
 
-export function ResourceTree({ app, nodes, onRestart }: Props) {
+export function ResourceTree({ appKey, app, nodes, onRestart }: Props) {
+  const [sideTab, setSideTab] = useState<'details' | 'logs'>('details')
+  const [sideW, setSideW] = useState(() => Number(localStorage.getItem('argodeck.treeSideW')) || 380)
+  const [logsW, setLogsW] = useState(() => Number(localStorage.getItem('argodeck.treeLogsW')) || 720)
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const x0 = e.clientX
+    const w0 = sideTab === 'logs' ? logsW : sideW
+    document.body.classList.add('resizing')
+    const move = (ev: MouseEvent) => {
+      const w = Math.max(300, Math.min(window.innerWidth - 300, w0 + x0 - ev.clientX))
+      if (sideTab === 'logs') setLogsW(w)
+      else setSideW(w)
+    }
+    const up = () => {
+      document.body.classList.remove('resizing')
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+  useEffect(() => {
+    try {
+      localStorage.setItem('argodeck.treeSideW', String(sideW))
+      localStorage.setItem('argodeck.treeLogsW', String(logsW))
+    } catch { /* ignore */ }
+  }, [sideW, logsW])
   const [zoom, setZoom] = useState(1)
   const [filter, setFilter] = useState('')
   const [onlyBad, setOnlyBad] = useState(false)
@@ -196,7 +225,8 @@ export function ResourceTree({ app, nodes, onRestart }: Props) {
                     key={p.id}
                     className={'rnode' + sev + (selected === n.id ? ' selected' : '') + (n.managed ? '' : ' child')}
                     style={{ left: p.x, top: p.y + 10 }}
-                    onClick={(e) => { e.stopPropagation(); setSelected(n.id) }}
+                    onClick={(e) => { e.stopPropagation(); setSelected(n.id); if (!n.hasLogs) setSideTab('details') }}
+                    onDoubleClick={(e) => { e.stopPropagation(); if (n.hasLogs) { setSelected(n.id); setSideTab('logs') } }}
                     title={n.healthMsg || undefined}
                   >
                     <span className="kicon">{kindAbbr[n.kind] ?? n.kind.slice(0, 4).toLowerCase()}</span>
@@ -218,7 +248,8 @@ export function ResourceTree({ app, nodes, onRestart }: Props) {
           </div>
         </div>
         {sel && (
-          <div className="rtree-side selectable">
+          <div className={'rtree-side selectable' + (sideTab === 'logs' && sel.hasLogs ? ' logs-mode' : '')} style={{ width: sideTab === 'logs' && sel.hasLogs ? logsW : sideW }}>
+            <div className="side-resizer" onMouseDown={startResize} title="Drag to resize" />
             <div className="rtree-side-head">
               <span className="kicon">{kindAbbr[sel.kind] ?? sel.kind.slice(0, 4).toLowerCase()}</span>
               <div style={{ minWidth: 0 }}>
@@ -227,6 +258,13 @@ export function ResourceTree({ app, nodes, onRestart }: Props) {
               </div>
               <button className="x" onClick={() => setSelected(null)}>✕</button>
             </div>
+            {sel.hasLogs && (
+              <div className="seg small" style={{ marginBottom: 12 }}>
+                <button className={sideTab === 'details' ? 'on' : ''} onClick={() => setSideTab('details')}>Details</button>
+                <button className={sideTab === 'logs' ? 'on' : ''} onClick={() => setSideTab('logs')}>Logs</button>
+              </div>
+            )}
+            {sideTab === 'logs' && sel.hasLogs ? <LogViewer key={sel.id} appKey={appKey} node={sel} /> : <>
             {sel.healthMsg && sel.health !== 'Healthy' && (
               <div className="problem-box" style={{ margin: '0 0 12px' }}>
                 <div className="problem-line error"><span className="tag error">{sel.health}</span><div className="msg">{sel.healthMsg}</div></div>
@@ -247,6 +285,7 @@ export function ResourceTree({ app, nodes, onRestart }: Props) {
                 <button className="btn" onClick={() => onRestart(sel)}>↻ Restart {sel.kind}</button>
               </div>
             )}
+            </>}
           </div>
         )}
       </div>

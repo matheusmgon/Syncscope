@@ -66,13 +66,13 @@ export function AppTiles(p: Props) {
           </div>
           <div className="tile-grid">
             <span className="k">Project</span>
-            <span className="v"><span className="link" onClick={(e) => { e.stopPropagation(); p.onAddFilter('project:' + a.project) }}>{a.project}</span>{p.ctxNames.size > 1 && <span className="sub">{p.ctxNames.get(a.ctx)}</span>}</span>
+            <span className="v"><span className="link" onClick={(e) => { e.stopPropagation(); p.onAddFilter(`project:"${a.project}"`) }}>{a.project}</span>{p.ctxNames.size > 1 && <span className="sub">{p.ctxNames.get(a.ctx)}</span>}</span>
             <span className="k">Status</span>
             <span className="v">
               <HealthIcon status={a.health} /> {a.health} <SyncIcon status={a.sync} running={a.opPhase === 'Running'} /> {a.sync}
             </span>
             <span className="k">ApplicationSet</span>
-            <span className="v">{a.appSet ? <span className="link" onClick={(e) => { e.stopPropagation(); p.onAddFilter('appset:' + a.appSet) }}>{a.appSet}</span> : '—'}</span>
+            <span className="v">{a.appSet ? <span className="link" onClick={(e) => { e.stopPropagation(); p.onAddFilter(`appset:"${a.appSet}"`) }}>{a.appSet}</span> : '—'}</span>
             <span className="k">Destination</span>
             <span className="v" title={a.clusterServer}>{a.cluster}/{a.destNamespace}</span>
             <span className="k">Target</span>

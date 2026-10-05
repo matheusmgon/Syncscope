@@ -361,6 +361,7 @@ export namespace store {
 	    hook: boolean;
 	    prune: boolean;
 	    restartable: boolean;
+	    hasLogs: boolean;
 	    info?: Record<string, string>;
 	    images?: string[];
 	    createdAt?: string;
@@ -385,6 +386,7 @@ export namespace store {
 	        this.hook = source["hook"];
 	        this.prune = source["prune"];
 	        this.restartable = source["restartable"];
+	        this.hasLogs = source["hasLogs"];
 	        this.info = source["info"];
 	        this.images = source["images"];
 	        this.createdAt = source["createdAt"];
@@ -651,6 +653,8 @@ export namespace store {
 	    version?: string;
 	    user?: string;
 	    synced?: string;
+	    appSetsError?: string;
+	    clustersError?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ContextStatus(source);
@@ -669,6 +673,36 @@ export namespace store {
 	        this.version = source["version"];
 	        this.user = source["user"];
 	        this.synced = source["synced"];
+	        this.appSetsError = source["appSetsError"];
+	        this.clustersError = source["clustersError"];
+	    }
+	}
+	export class LogRequest {
+	    group: string;
+	    version: string;
+	    kind: string;
+	    namespace: string;
+	    name: string;
+	    container: string;
+	    tailLines: number;
+	    follow: boolean;
+	    previous: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.group = source["group"];
+	        this.version = source["version"];
+	        this.kind = source["kind"];
+	        this.namespace = source["namespace"];
+	        this.name = source["name"];
+	        this.container = source["container"];
+	        this.tailLines = source["tailLines"];
+	        this.follow = source["follow"];
+	        this.previous = source["previous"];
 	    }
 	}
 	

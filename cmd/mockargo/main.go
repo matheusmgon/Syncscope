@@ -14,6 +14,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -406,6 +407,59 @@ func main() {
 					"info": []obj{{"name": "Status Reason", "value": "Running"}, {"name": "Containers", "value": "1/1"}, {"name": "Node", "value": "gke-pool-1-a1b2"}}})
 			}
 			writeJSON(w, obj{"nodes": nodes})
+		case sub == "resource":
+			q := r.URL.Query()
+			containers := []obj{{"name": "app", "image": "ghcr.io/acme/app:v2.3.1"}, {"name": "istio-proxy", "image": "istio/proxyv2:1.22"}}
+			var spec obj
+			if q.Get("kind") == "Pod" {
+				spec = obj{"containers": containers, "initContainers": []obj{{"name": "migrate"}}}
+			} else {
+				spec = obj{"template": obj{"spec": obj{"containers": containers}}}
+			}
+			man, _ := json.Marshal(obj{"apiVersion": "v1", "kind": q.Get("kind"), "metadata": obj{"name": q.Get("resourceName"), "namespace": q.Get("namespace")}, "spec": spec})
+			writeJSON(w, obj{"manifest": string(man)})
+		case sub == "logs":
+			q := r.URL.Query()
+			fl, _ := w.(http.Flusher)
+			w.Header().Set("Content-Type", "application/json")
+			enc := json.NewEncoder(w)
+			pod := q.Get("podName")
+			if pod == "" {
+				pod = q.Get("resourceName") + "-7d9f8b6c5d-ab10c"
+			}
+			bad := strings.Contains(pod, "x2k9p") || strings.Contains(pod, "q8w7e")
+			tail, _ := strconv.Atoi(q.Get("tailLines"))
+			if tail == 0 || tail > 300 {
+				tail = 300
+			}
+			line := func(i int, t time.Time) string {
+				if bad && i%7 == 6 {
+					return fmt.Sprintf(`{"level":"error","ts":"%s","msg":"failed to connect to postgres","error":"dial tcp 10.0.3.4:5432: connect: connection refused","container":"%s"}`, t.Format(time.RFC3339), q.Get("container"))
+				}
+				return fmt.Sprintf(`{"level":"info","ts":"%s","msg":"GET /api/v1/items 200","latency_ms":%d,"container":"%s"}`, t.Format(time.RFC3339), 3+i%40, q.Get("container"))
+			}
+			now := time.Now()
+			for i := 0; i < tail; i++ {
+				t := now.Add(time.Duration(i-tail) * time.Second)
+				_ = enc.Encode(obj{"result": obj{"content": line(i, t), "timeStamp": t.Format(time.RFC3339Nano), "podName": pod}})
+			}
+			if bad {
+				_ = enc.Encode(obj{"result": obj{"content": "panic: runtime error: invalid memory address or nil pointer dereference", "timeStamp": now.Format(time.RFC3339Nano), "podName": pod}})
+			}
+			fl.Flush()
+			if q.Get("follow") != "true" {
+				_ = enc.Encode(obj{"result": obj{"last": true}})
+				return
+			}
+			for i := tail; ; i++ {
+				select {
+				case <-r.Context().Done():
+					return
+				case <-time.After(700 * time.Millisecond):
+					_ = enc.Encode(obj{"result": obj{"content": line(i, time.Now()), "timeStamp": time.Now().Format(time.RFC3339Nano), "podName": pod}})
+					fl.Flush()
+				}
+			}
 		default:
 			w.WriteHeader(404)
 			writeJSON(w, obj{"message": "not found: " + sub})

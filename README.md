@@ -16,6 +16,7 @@ Argo CD instances.
   |---|---|
   | `payments api` | free text over name, appset, project, cluster, namespace, repo, path, labels (AND) |
   | `"exact phrase"`, `-legacy` | phrase / negation (works on every term) |
+  | `appset:"x"` (quoted = exact match) | `appset:x` alone is a substring match |
   | `appset:x` `project:x` `cluster:x` `ns:x` `repo:x` `rev:main` `ctx:prod` `name:x` | field filters |
   | `health:degraded` `sync:outofsync` | status |
   | `label:team=core`, `label:team` | labels |
@@ -37,7 +38,9 @@ Argo CD instances.
 - **Application view like Argo CD**: full-page detail with a **Tree** tab (resource
   graph Application → Deployment → ReplicaSet → Pod, edges highlighted in red on the
   failing path, collapse/expand, filter, "only unhealthy", zoom with ⌘+wheel and
-  Fit, side panel per resource with health message, info and restart), plus
+  Fit, side panel per resource with health message, info, restart and **live logs**
+  — pod or whole workload, container picker, follow, previous container, filter,
+  error highlighting; double-click a pod to open its logs), plus
   **Summary** and **Resources** tabs.
 - **List or Tiles** for the applications page (tiles mirror the Argo CD cards).
 - Collapsible / resizable sidebar (⌘B).

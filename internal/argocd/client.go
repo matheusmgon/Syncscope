@@ -409,9 +409,8 @@ func (c *Client) UserInfo(ctx context.Context) (*UserInfo, error) {
 // Fields requested on list/watch. Mirrors what the Argo CD UI asks for, plus
 // conditions and sync results so failures can be explained.
 var appFields = []string{
-	"metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations",
-	"metadata.creationTimestamp", "metadata.deletionTimestamp", "metadata.ownerReferences",
-	"metadata.resourceVersion",
+	// whole metadata: ownerReferences (ApplicationSet link) must survive field filtering
+	"metadata",
 	"spec", "operation.sync",
 	"status.sync.status", "status.sync.revision", "status.sync.revisions",
 	"status.health", "status.operationState", "status.conditions",

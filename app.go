@@ -69,6 +69,14 @@ func (a *App) RestartResource(key string, r argocd.ResourceAction) error {
 	return a.m.RestartResource(key, r)
 }
 
+func (a *App) Containers(key string, r argocd.ResourceAction) ([]string, error) {
+	return a.m.Containers(key, r)
+}
+func (a *App) StartLogs(key string, req store.LogRequest) (string, error) {
+	return a.m.StartLogs(key, req)
+}
+func (a *App) StopLogs(id string) { a.m.StopLogs(id) }
+
 func (a *App) OpenInArgo(key string) error {
 	u, err := a.m.WebURL(key)
 	if err != nil {

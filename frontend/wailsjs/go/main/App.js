@@ -18,6 +18,10 @@ export function Clusters() {
   return window['go']['main']['App']['Clusters']();
 }
 
+export function Containers(arg1, arg2) {
+  return window['go']['main']['App']['Containers'](arg1, arg2);
+}
+
 export function Contexts() {
   return window['go']['main']['App']['Contexts']();
 }
@@ -86,8 +90,16 @@ export function SetPrefs(arg1) {
   return window['go']['main']['App']['SetPrefs'](arg1);
 }
 
+export function StartLogs(arg1, arg2) {
+  return window['go']['main']['App']['StartLogs'](arg1, arg2);
+}
+
 export function Statuses() {
   return window['go']['main']['App']['Statuses']();
+}
+
+export function StopLogs(arg1) {
+  return window['go']['main']['App']['StopLogs'](arg1);
 }
 
 export function Sync(arg1, arg2) {

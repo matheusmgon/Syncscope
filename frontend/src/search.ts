@@ -10,7 +10,7 @@ import type { App } from './data'
     is:error  is:warning  is:problem  is:auto  is:manual  is:running  is:deleting
 */
 
-type Term = { neg: boolean; field: string; value: string }
+type Term = { neg: boolean; field: string; value: string; exact: boolean }
 
 const aliases: Record<string, string> = {
   as: 'appset', set: 'appset', applicationset: 'appset', proj: 'project', p: 'project',
@@ -25,26 +25,27 @@ export function parseQuery(q: string): Term[] {
     const field = (m[2] ?? '').toLowerCase()
     const value = (m[3] ?? m[4] ?? '').toLowerCase()
     if (!value && !field) continue
-    terms.push({ neg: m[1] === '-', field: aliases[field] ?? field, value })
+    terms.push({ neg: m[1] === '-', field: aliases[field] ?? field, value, exact: m[3] !== undefined })
   }
   return terms
 }
 
 function test(a: App, t: Term, ctxNames: Map<string, string>): boolean {
   const v = t.value
+  const has = (s: string) => (t.exact ? s.toLowerCase() === v : s.toLowerCase().includes(v))
   switch (t.field) {
     case '':
       return a.hay.includes(v)
     case 'name':
-      return a.name.toLowerCase().includes(v)
+      return has(a.name)
     case 'appset':
-      return v === '' || v === 'none' ? !a.appSet : a.appSet.toLowerCase().includes(v)
+      return (v === '' || v === 'none') && !t.exact ? !a.appSet : has(a.appSet)
     case 'project':
-      return a.project.toLowerCase().includes(v)
+      return has(a.project)
     case 'cluster':
-      return a.cluster.toLowerCase().includes(v) || a.clusterServer.toLowerCase().includes(v)
+      return has(a.cluster) || has(a.clusterServer)
     case 'ns':
-      return a.destNamespace.toLowerCase().includes(v)
+      return has(a.destNamespace)
     case 'repo':
       return a.repo.toLowerCase().includes(v) || a.path.toLowerCase().includes(v)
     case 'rev':

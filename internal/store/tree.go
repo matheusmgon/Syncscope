@@ -24,6 +24,7 @@ type TreeNode struct {
 	Hook        bool              `json:"hook"`
 	Prune       bool              `json:"prune"`
 	Restartable bool              `json:"restartable"`
+	HasLogs     bool              `json:"hasLogs"`
 	Info        map[string]string `json:"info,omitempty"`
 	Images      []string          `json:"images,omitempty"`
 	CreatedAt   string            `json:"createdAt,omitempty"`
@@ -59,7 +60,7 @@ func buildTree(a *argocd.Application, t *argocd.ResourceTree) []TreeNode {
 			}
 			seen[id] = true
 			tn := TreeNode{ID: id, Group: n.Group, Version: n.Version, Kind: n.Kind, Namespace: n.Namespace, Name: n.Name,
-				Images: n.Images, CreatedAt: n.CreatedAt, Restartable: isRestartable(n.Group, n.Kind)}
+				Images: n.Images, CreatedAt: n.CreatedAt, Restartable: isRestartable(n.Group, n.Kind), HasLogs: HasLogs(n.Kind)}
 			if n.Health != nil {
 				tn.Health, tn.HealthMsg = n.Health.Status, n.Health.Message
 			}

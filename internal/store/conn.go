@@ -194,7 +194,11 @@ func (c *conn) refreshAux(ctx context.Context, rebuild bool) {
 	rctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	changed := false
-	if cls, err := c.client.ListClusters(rctx); err == nil {
+	cls, cerr := c.client.ListClusters(rctx)
+	c.mu.Lock()
+	c.status.ClustersError = errString(cerr)
+	c.mu.Unlock()
+	if cerr == nil {
 		ci := clusterInfo{byServer: map[string]argocd.Cluster{}, byName: map[string]argocd.Cluster{}}
 		for _, cl := range cls {
 			ci.byServer[cl.Server] = cl
@@ -217,7 +221,12 @@ func (c *conn) refreshAux(ctx context.Context, rebuild bool) {
 		c.clusters = ci
 		c.mu.Unlock()
 	}
-	if sets, err := c.client.ListApplicationSets(rctx); err == nil {
+	sets, serr := c.client.ListApplicationSets(rctx)
+	c.mu.Lock()
+	c.status.AppSetsError = errString(serr)
+	c.mu.Unlock()
+	c.m.emitStatus()
+	if serr == nil {
 		out := make(map[string]AppSetSummary, len(sets))
 		for _, s := range sets {
 			as := AppSetSummary{Key: c.cfg.ID + "|" + s.Metadata.Namespace + "/" + s.Metadata.Name, Ctx: c.cfg.ID, Name: s.Metadata.Name, Namespace: s.Metadata.Namespace}
@@ -364,4 +373,11 @@ func (c *conn) onEvent(ev argocd.ApplicationWatchEvent) {
 	c.mu.Unlock()
 	c.m.queueUp(s)
 	c.maybeEnrich(key, &a)
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

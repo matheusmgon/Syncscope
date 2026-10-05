@@ -33,7 +33,7 @@ function groupKey(a: App, g: GroupBy, ctxNames: Map<string, string>) {
 }
 
 function q(v: string) {
-  return /\s/.test(v) ? `"${v}"` : v
+  return `"${v}"`
 }
 
 export function AppTable(p: Props) {
