@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 // Problem is one human-readable reason an application is unhealthy or failed.

@@ -3,13 +3,13 @@ package store
 import (
 	"testing"
 
-	"argodeck/internal/argocd"
-	"argodeck/internal/config"
+	"syncscope/internal/argocd"
+	"syncscope/internal/config"
 )
 
 func TestCacheRoundTrip(t *testing.T) {
-	t.Setenv("ARGODECK_CONFIG_DIR", t.TempDir())
-	t.Setenv("ARGODECK_NO_KEYRING", "1")
+	t.Setenv("SYNCSCOPE_CONFIG_DIR", t.TempDir())
+	t.Setenv("SYNCSCOPE_NO_KEYRING", "1")
 	cfg, _ := config.Open()
 	ctx, _ := cfg.Upsert(config.Context{Name: "c", Server: "https://argocd.example.com"})
 	var snaps []int

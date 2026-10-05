@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 func opCtx() (context.Context, context.CancelFunc) {

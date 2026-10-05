@@ -22,7 +22,7 @@ func resQuery(appNs, project string, r ResourceAction) url.Values {
 // ---- raw application (full object round-trip) ------------------------------
 
 // GetApplicationRaw returns the full Application as a generic map so it can be
-// edited and written back without losing fields ArgoDeck does not model.
+// edited and written back without losing fields Syncscope does not model.
 func (c *Client) GetApplicationRaw(ctx context.Context, name, appNs string) (map[string]any, error) {
 	q := url.Values{}
 	if appNs != "" {

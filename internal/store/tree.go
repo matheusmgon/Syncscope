@@ -3,7 +3,7 @@ package store
 import (
 	"strings"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 // TreeNode is one node of the application resource graph, as drawn by the

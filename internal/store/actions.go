@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 type ActionResult struct {

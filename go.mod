@@ -1,4 +1,4 @@
-module argodeck
+module syncscope
 
 go 1.25.0
 

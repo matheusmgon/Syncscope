@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 type DeleteOptions struct {

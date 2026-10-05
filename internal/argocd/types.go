@@ -1,6 +1,6 @@
 package argocd
 
-// Minimal subset of the Argo CD API types. Only the fields ArgoDeck reads are
+// Minimal subset of the Argo CD API types. Only the fields Syncscope reads are
 // declared, which keeps decoding of very large application lists cheap.
 
 type OwnerReference struct {

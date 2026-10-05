@@ -169,7 +169,7 @@ func (c *Client) LoginSSO(ctx context.Context, port int, offlineAccess bool, ope
 		if res.err != nil {
 			fmt.Fprintf(w, callbackPage, "#e96d76", "Login failed", html.EscapeString(res.err.Error()))
 		} else {
-			fmt.Fprintf(w, callbackPage, "#18be94", "Login complete", "You can close this tab and return to ArgoDeck.")
+			fmt.Fprintf(w, callbackPage, "#18be94", "Login complete", "You can close this tab and return to Syncscope.")
 		}
 		select {
 		case done <- res:
@@ -268,7 +268,7 @@ func (c *Client) tokenRequest(ctx context.Context, info *oidcInfo, form url.Valu
 	return Credentials{Token: t, RefreshToken: tok.RefreshToken}, nil
 }
 
-const callbackPage = `<!doctype html><html><head><meta charset="utf-8"><title>ArgoDeck</title></head>
+const callbackPage = `<!doctype html><html><head><meta charset="utf-8"><title>Syncscope</title></head>
 <body style="font-family:system-ui,sans-serif;background:#0f2733;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div style="text-align:center"><div style="width:14px;height:14px;border-radius:50%%;background:%s;margin:0 auto 16px"></div>
 <h2 style="margin:0 0 8px">%s</h2><p style="opacity:.8">%s</p></div></body></html>`

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="200 200 624 624">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#16324a"/>
@@ -16,8 +16,8 @@
       <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity=".35"/>
     </filter>
   </defs>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#sh)"/>
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="3"/>
+  
+  
   <path d="M279.9,378.0 A268,268 0 0 1 778.5,540.0 M744.1,646.0 A268,268 0 0 1 245.5,484.0" fill="none" stroke="url(#ring)" stroke-width="46" stroke-linecap="round"/>
   <path d="M770.9,581.4 L815.5,527.9 L743.7,524.1 Z M253.1,442.6 L208.5,496.1 L280.3,499.9 Z" fill="url(#ring)" stroke="url(#ring)" stroke-width="10" stroke-linejoin="round"/>
   <circle cx="512" cy="512" r="168" fill="url(#lens)" stroke="#9fe9f0" stroke-opacity=".35" stroke-width="6"/>

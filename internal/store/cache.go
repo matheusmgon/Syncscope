@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 // On-disk snapshot of an instance, so a restart shows the last known state

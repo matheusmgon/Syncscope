@@ -33,8 +33,8 @@ type Props = {
 }
 
 export function ResourcePanel({ appKey, node, tab, setTab, selfHeal, onClose, notify }: Props) {
-  const [narrowW, setNarrowW] = useState(() => Number(localStorage.getItem('argodeck.treeSideW')) || 380)
-  const [wideW, setWideW] = useState(() => Number(localStorage.getItem('argodeck.treeLogsW')) || 760)
+  const [narrowW, setNarrowW] = useState(() => Number(localStorage.getItem('syncscope.treeSideW')) || 380)
+  const [wideW, setWideW] = useState(() => Number(localStorage.getItem('syncscope.treeLogsW')) || 760)
   const [actions, setActions] = useState<argocd.ActionDef[] | null>(null)
   const [menu, setMenu] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -49,8 +49,8 @@ export function ResourcePanel({ appKey, node, tab, setTab, selfHeal, onClose, no
 
   useEffect(() => {
     try {
-      localStorage.setItem('argodeck.treeSideW', String(narrowW))
-      localStorage.setItem('argodeck.treeLogsW', String(wideW))
+      localStorage.setItem('syncscope.treeSideW', String(narrowW))
+      localStorage.setItem('syncscope.treeLogsW', String(wideW))
     } catch { /* ignore */ }
   }, [narrowW, wideW])
 

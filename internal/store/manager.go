@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"argodeck/internal/argocd"
-	"argodeck/internal/config"
+	"syncscope/internal/argocd"
+	"syncscope/internal/config"
 )
 
 // Emitter pushes events to the UI.

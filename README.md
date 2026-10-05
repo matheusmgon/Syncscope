@@ -1,8 +1,17 @@
-# ArgoDeck
+<p align="center"><img src="build/appicon.png" width="128" alt="Syncscope icon"></p>
 
-Cross-platform desktop manager for Argo CD (Go + Wails + React), built for
-installations with thousands of ApplicationSet-generated apps across many
-Argo CD instances.
+# Syncscope
+
+**A fast, cross-platform desktop app for Argo CD** — every instance and cluster in one
+place, instant search over thousands of applications, and failures explained instead of
+hidden. Built with Go + Wails + React.
+
+Syncscope aims to cover everything the Argo CD web UI does, plus what it lacks when you
+run ApplicationSets at scale: multi-instance view, problem grouping, bulk operations and
+an offline cache.
+
+> Syncscope is an independent project. It is **not affiliated with or endorsed by** the
+> Argo project or the CNCF. Argo and Argo CD are trademarks of The Linux Foundation.
 
 ## Features
 
@@ -89,7 +98,7 @@ proxies from the environment.
 
 Secrets are stored in the OS keychain (macOS Keychain, Windows Credential
 Manager, Secret Service on Linux), falling back to a `0600` file if no
-keychain is available. Config lives in the user config dir (`argodeck/`).
+keychain is available. Config lives in the user config dir (`syncscope/`).
 
 Not supported: `--core` mode (talking to Kubernetes directly without an Argo CD
 API server).
@@ -100,7 +109,7 @@ Requirements: Go 1.25+, Node 20+, Wails CLI (`go install github.com/wailsapp/wai
 
 ```bash
 wails dev          # hot reload
-wails build        # build/bin/ArgoDeck.app (or .exe / Linux binary)
+wails build        # build/bin/Syncscope.app (or .exe / Linux binary)
 ```
 
 ### Mock Argo CD
@@ -114,7 +123,7 @@ go run ./cmd/mockargo -port 8099 -apps 15000 -name prod
 go run ./cmd/mockargo -port 8098 -apps 4000 -name staging
 
 # isolated config, no keychain
-ARGODECK_CONFIG_DIR=/tmp/argodeck-dev ARGODECK_NO_KEYRING=1 wails dev
+SYNCSCOPE_CONFIG_DIR=/tmp/syncscope-dev SYNCSCOPE_NO_KEYRING=1 wails dev
 ```
 
 ### Tests
@@ -158,3 +167,7 @@ sync windows, image updater integration, "open a PR instead of editing the spec"
 ### 4. Other Argo projects
 - **Argo Workflows** (workflows, templates, logs), **Argo Rollouts** (canary /
   blue-green status, promote, abort), **Argo Events** (event sources, sensors).
+
+## License
+
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE).

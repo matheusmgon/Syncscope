@@ -89,7 +89,7 @@ export function Settings(p: Props) {
                   </tbody>
                 </table>
                 <div className="help" style={{ marginTop: 12 }}>
-                  Credentials are stored in the system keychain. Config file: <code>~/Library/Application Support/argodeck/config.json</code> (macOS).
+                  Credentials are stored in the system keychain. Config file: <code>~/Library/Application Support/syncscope/config.json</code> (macOS).
                 </div>
               </>
             )}

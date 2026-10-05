@@ -28,7 +28,7 @@ const SYNCS = ['Synced', 'OutOfSync', 'Unknown']
 
 function load<T>(k: string, d: T): T {
   try {
-    const v = localStorage.getItem('argodeck.' + k)
+    const v = localStorage.getItem('syncscope.' + k)
     return v ? (JSON.parse(v) as T) : d
   } catch {
     return d
@@ -36,7 +36,7 @@ function load<T>(k: string, d: T): T {
 }
 function save(k: string, v: unknown) {
   try {
-    localStorage.setItem('argodeck.' + k, JSON.stringify(v))
+    localStorage.setItem('syncscope.' + k, JSON.stringify(v))
   } catch { /* ignore */ }
 }
 
@@ -281,7 +281,7 @@ export default function App() {
 
         {!anyCtx && (
           <div className="empty">
-            <h3>Welcome to ArgoDeck</h3>
+            <h3>Welcome to Syncscope</h3>
             <p>Add an Argo CD instance or import the contexts you already use with the <code>argocd</code> CLI.</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => setEditCtx('new')}>＋ Add instance</button>

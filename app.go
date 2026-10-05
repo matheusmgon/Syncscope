@@ -5,9 +5,9 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"argodeck/internal/argocd"
-	"argodeck/internal/config"
-	"argodeck/internal/store"
+	"syncscope/internal/argocd"
+	"syncscope/internal/config"
+	"syncscope/internal/store"
 )
 
 // App is the surface exposed to the frontend through Wails bindings.

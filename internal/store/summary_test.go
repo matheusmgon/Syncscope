@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 func TestTreeProblemsPrefersPods(t *testing.T) {

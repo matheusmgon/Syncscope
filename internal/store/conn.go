@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"argodeck/internal/argocd"
-	"argodeck/internal/config"
+	"syncscope/internal/argocd"
+	"syncscope/internal/config"
 )
 
 type enrichEntry struct {

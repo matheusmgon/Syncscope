@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"argodeck/internal/argocd"
-	"argodeck/internal/config"
+	"syncscope/internal/argocd"
+	"syncscope/internal/config"
 )
 
 type recorder struct {
@@ -54,8 +54,8 @@ func TestIntegration(t *testing.T) {
 	if url == "" {
 		t.Skip("MOCKARGO_URL not set")
 	}
-	t.Setenv("ARGODECK_CONFIG_DIR", t.TempDir())
-	t.Setenv("ARGODECK_NO_KEYRING", "1")
+	t.Setenv("SYNCSCOPE_CONFIG_DIR", t.TempDir())
+	t.Setenv("SYNCSCOPE_NO_KEYRING", "1")
 	cfg, err := config.Open()
 	if err != nil {
 		t.Fatal(err)

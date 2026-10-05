@@ -9,7 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	"argodeck/internal/config"
+	"syncscope/internal/config"
 )
 
 //go:embed all:frontend/dist
@@ -23,7 +23,7 @@ func main() {
 	app := NewApp(cfg)
 
 	err = wails.Run(&options.App{
-		Title:     "ArgoDeck",
+		Title:     "Syncscope",
 		Width:     1440,
 		Height:    900,
 		MinWidth:  960,
@@ -37,7 +37,7 @@ func main() {
 		Bind:             []interface{}{app},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),
-			About:    &mac.AboutInfo{Title: "ArgoDeck", Message: "Desktop manager for Argo CD"},
+			About:    &mac.AboutInfo{Title: "Syncscope", Message: "Desktop manager for Argo CD"},
 		},
 	})
 	if err != nil {

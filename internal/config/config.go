@@ -13,7 +13,7 @@ import (
 	"github.com/zalando/go-keyring"
 	"gopkg.in/yaml.v3"
 
-	"argodeck/internal/argocd"
+	"syncscope/internal/argocd"
 )
 
 // Auth methods supported, mirroring `argocd login` options.
@@ -67,24 +67,44 @@ type Store struct {
 	noKeyring bool
 }
 
-const keyringService = "argodeck"
+const keyringService = "syncscope"
 
-// Open loads the config from the user config dir. ARGODECK_CONFIG_DIR overrides
-// the location and ARGODECK_NO_KEYRING=1 keeps secrets in a 0600 file instead of
+// Pre-rename identifiers (the project was called "ArgoDeck"); migrated on first run.
+const (
+	legacyName       = "argodeck"
+	legacyEnvPrefix  = "ARGODECK_"
+	legacyKeyringSvc = legacyName
+)
+
+func env(name string) string {
+	if v := os.Getenv("SYNCSCOPE_" + name); v != "" {
+		return v
+	}
+	return os.Getenv(legacyEnvPrefix + name)
+}
+
+// Open loads the config from the user config dir. SYNCSCOPE_CONFIG_DIR overrides
+// the location and SYNCSCOPE_NO_KEYRING=1 keeps secrets in a 0600 file instead of
 // the OS keychain (useful for tests and headless setups).
 func Open() (*Store, error) {
-	dir := os.Getenv("ARGODECK_CONFIG_DIR")
+	dir := env("CONFIG_DIR")
 	if dir == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
 			return nil, err
 		}
-		dir = filepath.Join(base, "argodeck")
+		dir = filepath.Join(base, "syncscope")
+		// move the pre-rename config (and cache) over once
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(base, legacyName)); err == nil {
+				_ = os.Rename(filepath.Join(base, legacyName), dir)
+			}
+		}
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	s := &Store{dir: dir, fallback: map[string]argocd.Credentials{}, noKeyring: os.Getenv("ARGODECK_NO_KEYRING") == "1"}
+	s := &Store{dir: dir, fallback: map[string]argocd.Credentials{}, noKeyring: env("NO_KEYRING") == "1"}
 	if b, err := os.ReadFile(filepath.Join(dir, "config.json")); err == nil {
 		_ = json.Unmarshal(b, &s.data)
 	}
@@ -199,6 +219,15 @@ func (s *Store) Credentials(id string) argocd.Credentials {
 	}
 	if v, err := keyring.Get(keyringService, id); err == nil {
 		if json.Unmarshal([]byte(v), &cr) == nil {
+			return cr
+		}
+	}
+	// credentials saved before the rename: move them to the new service name
+	if v, err := keyring.Get(legacyKeyringSvc, id); err == nil {
+		if json.Unmarshal([]byte(v), &cr) == nil {
+			if keyring.Set(keyringService, id, v) == nil {
+				_ = keyring.Delete(legacyKeyringSvc, id)
+			}
 			return cr
 		}
 	}
