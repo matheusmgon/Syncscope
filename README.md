@@ -42,6 +42,21 @@ Argo CD instances.
   — pod or whole workload, container picker, follow, previous container, filter,
   error highlighting; double-click a pod to open its logs), plus
   **Summary** and **Resources** tabs.
+- **Instant startup with an on-disk cache**: the last known state of every instance
+  (apps, ApplicationSets, clusters, failure explanations) is shown immediately on
+  launch — even when the server is unreachable — while the live list + watch refresh
+  it in the background. Stored gzip-compressed (`0600`) next to the config.
+- **Pod terminal** through the Argo CD web terminal (xterm.js), container picker.
+- **Diff** live (cluster) vs desired (Git) for the whole app and per resource,
+  unified with collapsed context or full manifests.
+- **Kubernetes events** for the app and per resource (warnings first, auto-refresh).
+- **Per-resource actions**: every action Argo CD exposes (restart, pause, resume,
+  scale…), view/edit the live manifest, delete (foreground / force / orphan).
+- **Sync policy**: auto-sync, prune and self-heal per app or in bulk.
+- **Edit the app**: Helm values / parameters / value files / release name, Kustomize
+  images and name prefix/suffix, target revision, or the full spec as YAML
+  (validated by Argo CD). Changes on ApplicationSet-generated apps show whether the
+  ApplicationSet will revert them (`ignoreApplicationDifferences`, `applicationsSync`).
 - **History & rollback**: every deploy with its commit message, author and date;
   roll back to any previous deploy (prune optional).
 - **Delete** apps (cascade foreground/background or keep resources) from the app
@@ -122,19 +137,12 @@ cmd/mockargo               fake Argo CD server for development
 
 ## Roadmap
 
-### 1. Day-to-day operations (next)
-- **Pod terminal (exec)** via the Argo CD web terminal (`/terminal` websocket, xterm.js).
-  Needs `exec.enabled: "true"` in `argocd-cm` and the RBAC `exec, create` permission.
-- **Sync policy toggles**: auto-sync, self-heal, prune — per app and in bulk
-  ("pause self-heal on these 30 apps while I debug").
-- **Edit app parameters**: Helm values / parameters, Kustomize images, target revision.
-  Caveat: for ApplicationSet-generated apps the ApplicationSet controller reverts manual
-  spec changes unless the ApplicationSet uses `ignoreApplicationDifferences`; ArgoDeck
-  must detect and warn about this.
-- **Diff** live vs desired manifests (managed-resources), per resource and per app.
-- **Kubernetes events** per app and per resource.
-- **All resource actions** Argo CD exposes (scale, suspend/resume CronJob, Rollout
-  promote/abort…), and delete / view live manifest of a single resource.
+### 1. Day-to-day operations — done
+Terminal, sync policy, parameters / spec editing, diff, events, resource actions,
+live manifest edit and delete are implemented (see Features).
+
+Next in this area: create applications, sync of selected resources only,
+sync windows, image updater integration, "open a PR instead of editing the spec".
 
 ### 2. Distribution and quality
 - Signed and notarized macOS builds; Windows and Linux builds.
