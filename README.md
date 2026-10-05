@@ -122,15 +122,31 @@ cmd/mockargo               fake Argo CD server for development
 
 ## Roadmap
 
-- Edit Argo CD configuration from Settings (repositories, projects, clusters, accounts)
-- Other Argo projects: **Argo Workflows** (workflows, templates, logs), **Argo Rollouts**
-  (canary / blue-green status, promote, abort), **Argo Events** (event sources, sensors)
-- App icon with the Argo look
+### 1. Day-to-day operations (next)
+- **Pod terminal (exec)** via the Argo CD web terminal (`/terminal` websocket, xterm.js).
+  Needs `exec.enabled: "true"` in `argocd-cm` and the RBAC `exec, create` permission.
+- **Sync policy toggles**: auto-sync, self-heal, prune — per app and in bulk
+  ("pause self-heal on these 30 apps while I debug").
+- **Edit app parameters**: Helm values / parameters, Kustomize images, target revision.
+  Caveat: for ApplicationSet-generated apps the ApplicationSet controller reverts manual
+  spec changes unless the ApplicationSet uses `ignoreApplicationDifferences`; ArgoDeck
+  must detect and warn about this.
+- **Diff** live vs desired manifests (managed-resources), per resource and per app.
+- **Kubernetes events** per app and per resource.
+- **All resource actions** Argo CD exposes (scale, suspend/resume CronJob, Rollout
+  promote/abort…), and delete / view live manifest of a single resource.
 
-- Pod logs and Kubernetes events in the detail panel
-- Live manifest diff, rollback to a history entry
-- Sync windows, app deletion, editing sync policy
-- Desktop notifications when an app starts failing
-- Saved searches / favorites
-- `--core` mode
-- Code signing and notarization for distribution
+### 2. Distribution and quality
+- Signed and notarized macOS builds; Windows and Linux builds.
+- Release pipeline (GitHub Actions) and in-app auto-update.
+- End-to-end tests against a real Argo CD in kind, frontend tests.
+
+### 3. Productivity
+- Desktop notifications when an app starts failing / a sync fails.
+- Saved searches and favorites, recent apps, command palette.
+- Edit Argo CD configuration from Settings (repositories, projects, clusters, accounts).
+- `--core` mode (talk to Kubernetes directly).
+
+### 4. Other Argo projects
+- **Argo Workflows** (workflows, templates, logs), **Argo Rollouts** (canary /
+  blue-green status, promote, abort), **Argo Events** (event sources, sensors).

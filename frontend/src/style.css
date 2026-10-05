@@ -96,10 +96,7 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; gap: 10px; padding: 46px 16px 14px;
   color: var(--nav-fg-strong); font-weight: 600; font-size: 16px; letter-spacing: .3px;
 }
-.sidebar .brand .logo {
-  width: 28px; height: 28px; border-radius: 50%; background: var(--teal);
-  display: grid; place-items: center; font-weight: 700; color: #fff;
-}
+.sidebar .brand .logo { width: 24px; height: 31px; object-fit: contain; }
 .sidebar .section-title {
   padding: 14px 16px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7f97a5;
   display: flex; justify-content: space-between; align-items: center;

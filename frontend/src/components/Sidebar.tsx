@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react'
+import argoLogo from '../assets/argo.svg'
 import { store } from '../../wailsjs/go/models'
 import type { App } from '../data'
 
@@ -107,7 +108,7 @@ export function Sidebar(p: Props) {
         title="Drag to resize · double-click to reset"
       />
       <div className="brand">
-        <div className="logo">A</div>
+        <img className="logo" src={argoLogo} alt="" />
         <span style={{ flex: 1 }}>ArgoDeck</span>
         <button className="rail-btn toggle" title="Hide sidebar (⌘B)" onClick={() => p.onCollapse(true)}>«</button>
       </div>
