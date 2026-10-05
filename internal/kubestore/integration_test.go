@@ -121,6 +121,23 @@ func TestIntegration(t *testing.T) {
 
 	// workflow actions
 	running := find(m, "Workflow", "", func(o Obj) bool { return o.Phase == "Running" })
+	if running == nil {
+		// a long-lived mock may have finished all its runs: start one
+		tk := find(m, "WorkflowTemplate", "", nil)
+		k, err := m.SubmitTemplate(tk.Key, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wait(t, "new run visible", 5*time.Second, func() bool {
+			for _, o := range m.Objects() {
+				if o.Key == k && o.Phase == "Running" {
+					running = &o
+					return true
+				}
+			}
+			return false
+		})
+	}
 	if _, err := m.WorkflowAction(running.Key, "stop"); err != nil {
 		t.Fatal(err)
 	}

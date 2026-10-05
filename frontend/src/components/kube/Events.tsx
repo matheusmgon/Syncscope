@@ -60,7 +60,23 @@ export function EventsView({ query, ctxFilter, onOpen }: { query: string; ctxFil
 // Event sources → sensors → triggers, like the Argo Workflows "Event Flow" page.
 const FW = 230, FH = 44, GAP = 14, COLS = [0, 360, 720]
 
+// One diagram per cluster: sources only feed sensors of their own cluster.
 function Flow({ sources, sensors, onOpen }: { sources: KObj[]; sensors: KObj[]; onOpen: (k: string) => void }) {
+  const ctxs = [...new Set([...sources, ...sensors].map((o) => o.ctx))].sort()
+  if (!ctxs.length) return <NoKube what="event sources or sensors" />
+  return (
+    <div className="rtree-canvas" style={{ flex: 1 }}>
+      {ctxs.map((c) => (
+        <div key={c} className="flow-cluster">
+          {ctxs.length > 1 && <div className="flow-cluster-title">{c}</div>}
+          <FlowBlock sources={sources.filter((o) => o.ctx === c)} sensors={sensors.filter((o) => o.ctx === c)} onOpen={onOpen} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FlowBlock({ sources, sensors, onOpen }: { sources: KObj[]; sensors: KObj[]; onOpen: (k: string) => void }) {
   type N = { id: string; x: number; y: number; label: string; sub: string; obj?: KObj; bad?: boolean }
   const nodes: N[] = []
   const edges: { a: string; b: string; bad: boolean }[] = []
@@ -98,9 +114,9 @@ function Flow({ sources, sensors, onOpen }: { sources: KObj[]; sensors: KObj[]; 
   }
   const pos = new Map(nodes.map((n) => [n.id, n]))
   const height = Math.max(y0, y1, y2) + 20
-  if (!nodes.length) return <NoKube what="event sources or sensors" />
+  if (!nodes.length) return <div className="muted-sm" style={{ padding: 20 }}>No event sources or sensors.</div>
   return (
-    <div className="rtree-canvas" style={{ flex: 1 }}>
+    <div>
       <div className="flow-heads"><span style={{ left: COLS[0] + 20 }}>Event sources</span><span style={{ left: COLS[1] + 20 }}>Sensors</span><span style={{ left: COLS[2] + 20 }}>Triggers</span></div>
       <div style={{ position: 'relative', width: COLS[2] + FW + 40, height, margin: '8px 20px 20px' }}>
         <svg width={COLS[2] + FW + 40} height={height} className="rtree-edges">

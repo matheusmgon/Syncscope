@@ -160,9 +160,11 @@ func (m *Manager) StartLogs(r LogRequest) (string, error) {
 		}
 		var buf []line
 		last := time.Now()
+		seq := 0
 		flush := func() {
 			if len(buf) > 0 {
-				m.emit("logs", map[string]any{"id": id, "lines": buf})
+				seq++
+				m.emit("logs", map[string]any{"id": id, "seq": seq, "lines": buf})
 				buf = nil
 			}
 			last = time.Now()
@@ -179,7 +181,8 @@ func (m *Manager) StartLogs(r LogRequest) (string, error) {
 		if err != nil && ctx.Err() == nil {
 			msg = err.Error()
 		}
-		m.emit("logs", map[string]any{"id": id, "done": true, "error": msg})
+		seq++
+		m.emit("logs", map[string]any{"id": id, "seq": seq, "done": true, "error": msg})
 	}()
 	return id, nil
 }

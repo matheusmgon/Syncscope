@@ -472,7 +472,37 @@ func (m *Manager) StartTerminal(key string, r TerminalRequest) (string, error) {
 	m.terms.m[id] = t
 	m.terms.mu.Unlock()
 	go func() {
-		err := t.Read(func(s string) { m.emit("term", map[string]any{"id": id, "data": s}) })
+		// Output is coalesced (every ~12ms) and numbered: UI events are not
+		// guaranteed to arrive in order, so the terminal reorders by seq.
+		var mu sync.Mutex
+		var buf strings.Builder
+		seq := 0
+		flush := func() {
+			mu.Lock()
+			defer mu.Unlock()
+			if buf.Len() == 0 {
+				return
+			}
+			seq++
+			m.emit("term", map[string]any{"id": id, "seq": seq, "data": buf.String()})
+			buf.Reset()
+		}
+		stop := make(chan struct{})
+		go func() {
+			t := time.NewTicker(12 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					flush()
+				case <-stop:
+					return
+				}
+			}
+		}()
+		err := t.Read(func(s string) { mu.Lock(); buf.WriteString(s); mu.Unlock() })
+		close(stop)
+		flush()
 		m.terms.mu.Lock()
 		_, open := m.terms.m[id]
 		delete(m.terms.m, id)
@@ -481,7 +511,11 @@ func (m *Manager) StartTerminal(key string, r TerminalRequest) (string, error) {
 		if err != nil && open && !strings.Contains(err.Error(), "close") {
 			msg = err.Error()
 		}
-		m.emit("term", map[string]any{"id": id, "closed": true, "error": msg})
+		mu.Lock()
+		seq++
+		final := seq
+		mu.Unlock()
+		m.emit("term", map[string]any{"id": id, "seq": final, "closed": true, "error": msg})
 	}()
 	return id, nil
 }

@@ -108,13 +108,14 @@ func (m *Manager) StartLogs(key string, req LogRequest) (string, error) {
 		defer m.StopLogs(id)
 		var mu sync.Mutex
 		var buf []LogLine
+		seq := 0
 		flush := func() {
 			mu.Lock()
-			out := buf
-			buf = nil
-			mu.Unlock()
-			if len(out) > 0 {
-				m.emit("logs", map[string]any{"id": id, "lines": out})
+			defer mu.Unlock()
+			if len(buf) > 0 {
+				seq++
+				m.emit("logs", map[string]any{"id": id, "seq": seq, "lines": buf})
+				buf = nil
 			}
 		}
 		tick := time.NewTicker(150 * time.Millisecond)
@@ -141,7 +142,11 @@ func (m *Manager) StartLogs(key string, req LogRequest) (string, error) {
 		if err != nil && !errors.Is(err, io.EOF) && ctx.Err() == nil {
 			msg = err.Error()
 		}
-		m.emit("logs", map[string]any{"id": id, "done": true, "error": msg})
+		mu.Lock()
+		seq++
+		final := seq
+		mu.Unlock()
+		m.emit("logs", map[string]any{"id": id, "seq": final, "done": true, "error": msg})
 	}()
 	return id, nil
 }

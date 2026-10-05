@@ -10,7 +10,11 @@ Syncscope aims to cover everything the Argo CD web UI does, plus what it lacks w
 run ApplicationSets at scale: multi-instance view, problem grouping, bulk operations and
 an offline cache.
 
-Argo CD is supported today; Argo Workflows, Rollouts and Events are on the roadmap.
+Supports **Argo CD**, **Argo Workflows**, **Argo Rollouts** and **Argo Events**.
+
+📖 **[User guide with screenshots](docs/USER_GUIDE.md)**
+
+<p align="center"><img src="docs/images/07-app-tree.png" width="860" alt="Application resource tree"></p>
 
 > Syncscope is an independent project. It is **not affiliated with or endorsed by** the
 > Argo project or the CNCF. Argo and Argo CD are trademarks of The Linux Foundation.

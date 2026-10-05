@@ -640,3 +640,5 @@ textarea.code-block { max-height: none; }
 .pal-empty { padding: 20px; text-align: center; color: var(--fg-muted); }
 .pal-foot { padding: 8px 18px; font-size: 11px; color: var(--fg-faint); border-top: 1px solid var(--border-soft); }
 .toast.clickable { cursor: pointer; }
+.flow-cluster + .flow-cluster { border-top: 1px solid var(--border); }
+.flow-cluster-title { margin: 14px 20px 0; font-weight: 600; font-size: 13px; color: var(--fg); }

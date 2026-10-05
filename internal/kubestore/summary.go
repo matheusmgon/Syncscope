@@ -161,6 +161,9 @@ func rollout(s *Obj, o map[string]any, u *unstructured.Unstructured) {
 	if w := num(o, "status", "canary", "weights", "canary", "weight"); w > 0 {
 		weight = w
 	}
+	if boolean(o, "status", "abort") {
+		weight = 0 // aborted: all traffic is back on the stable version
+	}
 	f["weight"] = weight
 	for _, k := range []string{"replicas", "readyReplicas", "updatedReplicas", "availableReplicas"} {
 		f[k] = num(o, "status", k)
@@ -207,8 +210,13 @@ func rollout(s *Obj, o map[string]any, u *unstructured.Unstructured) {
 	} else if s.Phase == "Degraded" {
 		s.Problems = append(s.Problems, Problem{Severity: "error", Source: "rollout", Message: nonEmpty(s.Message, "rollout degraded")})
 	} else if s.Phase == "Paused" {
-		s.Problems = append(s.Problems, Problem{Severity: "warning", Source: "rollout",
-			Message: fmt.Sprintf("paused at step %d/%d (%s) — waiting for promotion", idx, len(steps), strings.Join(reasons, ", "))})
+		msg := fmt.Sprintf("paused at step %d/%d (%s) — waiting for promotion", idx, len(steps), strings.Join(reasons, ", "))
+		if strategy == "blueGreen" {
+			msg = "new version is up on the preview service — waiting for promotion (" + strings.Join(reasons, ", ") + ")"
+		} else if len(reasons) == 0 {
+			msg = fmt.Sprintf("paused at step %d/%d — waiting for promotion", idx, len(steps))
+		}
+		s.Problems = append(s.Problems, Problem{Severity: "warning", Source: "rollout", Message: msg})
 	}
 	for _, c := range conditions(o) {
 		t, st := str(c, "type"), str(c, "status")

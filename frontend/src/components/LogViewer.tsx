@@ -94,8 +94,23 @@ export function LogStream({ source }: { source: LogSource }) {
     setAtBottom(true)
     setVersion((v) => v + 1)
     setState({ status: 'loading' })
-    const off = EventsOn('logs', (p: { id: string; lines?: Line[]; done?: boolean; error?: string }) => {
-      if (p.id !== id) return
+    // batches are numbered by the backend; apply them strictly in order
+    let next = 1
+    const pending = new Map<number, { lines?: Line[]; done?: boolean; error?: string }>()
+    const off = EventsOn('logs', (msg: { id: string; seq?: number; lines?: Line[]; done?: boolean; error?: string }) => {
+      if (msg.id !== id) return
+      if (msg.seq) {
+        pending.set(msg.seq, msg)
+        while (pending.has(next)) {
+          handle(pending.get(next)!)
+          pending.delete(next)
+          next++
+        }
+        return
+      }
+      handle(msg)
+    })
+    function handle(p: { lines?: Line[]; done?: boolean; error?: string }) {
       if (p.lines?.length) {
         const all = lines.current
         all.push(...p.lines)
@@ -104,7 +119,7 @@ export function LogStream({ source }: { source: LogSource }) {
         setState((s) => (s.status === 'loading' ? { status: 'streaming' } : s))
       }
       if (p.done) setState(p.error ? { status: 'error', error: p.error } : { status: 'ended' })
-    })
+    }
     source.start({ container, tailLines: tail, follow, previous })
       .then((x) => {
         id = x

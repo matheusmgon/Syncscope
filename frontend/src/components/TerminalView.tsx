@@ -38,12 +38,24 @@ export function TerminalView({ appKey, node }: { appKey: string; node: store.Tre
     let dead = false
     setState({ s: 'connecting' })
     term.writeln(`\x1b[90mConnecting to ${node.namespace}/${node.name} (${container})…\x1b[0m`)
-    const off = EventsOn('term', (p: { id: string; data?: string; closed?: boolean; error?: string }) => {
-      if (p.id !== id) return
+    // chunks are numbered by the backend; apply them strictly in order
+    let next = 1
+    const pending = new Map<number, { data?: string; closed?: boolean; error?: string }>()
+    const apply = (p: { data?: string; closed?: boolean; error?: string }) => {
       if (p.data) term.write(p.data)
       if (p.closed) {
         setState(p.error ? { s: 'error', msg: p.error } : { s: 'closed' })
         term.writeln('\r\n\x1b[90m[session closed]\x1b[0m')
+      }
+    }
+    const off = EventsOn('term', (p: { id: string; seq?: number; data?: string; closed?: boolean; error?: string }) => {
+      if (p.id !== id) return
+      if (!p.seq) return apply(p)
+      pending.set(p.seq, p)
+      while (pending.has(next)) {
+        apply(pending.get(next)!)
+        pending.delete(next)
+        next++
       }
     })
     API.StartTerminal(appKey, store.TerminalRequest.createFrom({ namespace: node.namespace, pod: node.name, container }))
