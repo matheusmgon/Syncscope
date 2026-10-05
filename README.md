@@ -17,71 +17,69 @@ Argo CD is supported today; Argo Workflows, Rollouts and Events are on the roadm
 
 ## Features
 
-- **Multiple Argo CD instances** side by side, each with its own live connection.
-- **Live updates** via `/api/v1/stream/applications` (no polling), with
-  automatic reconnect and re-list.
-- **Instant search** over an in-memory index (tens of thousands of apps,
-  virtualized table). Query language:
+### One window for the Argo tools
+- **Argo CD** — every instance side by side (API server, or `--core` mode straight through Kubernetes).
+- **Argo Workflows** — workflows (DAG / steps graph, step logs, inputs/outputs), WorkflowTemplates
+  (submit with parameters), CronWorkflows (run now, suspend/resume); stop, terminate, suspend,
+  resume, resubmit, delete.
+- **Argo Rollouts** — canary / blue-green status (step, weight, replicas, stable vs canary),
+  steps timeline, promote, promote-full, pause, abort, retry, restart; link to the owning Argo CD app.
+- **Argo Events** — event flow graph (EventSources → Sensors → Triggers), EventSources, Sensors,
+  EventBus, conditions, pods and logs, restart.
+- Workflows, Rollouts and Events (and core mode) are read from **Kubernetes via your kubeconfig**,
+  like Lens: pick the contexts in *Settings → Kubernetes clusters* (exec auth plugins such as
+  `gke-gcloud-auth-plugin` work; nothing is contacted until you enable it).
 
-  | Query | Meaning |
-  |---|---|
-  | `payments api` | free text over name, appset, project, cluster, namespace, repo, path, labels (AND) |
-  | `"exact phrase"`, `-legacy` | phrase / negation (works on every term) |
-  | `appset:"x"` (quoted = exact match) | `appset:x` alone is a substring match |
-  | `appset:x` `project:x` `cluster:x` `ns:x` `repo:x` `rev:main` `ctx:prod` `name:x` | field filters |
-  | `health:degraded` `sync:outofsync` | status |
-  | `label:team=core`, `label:team` | labels |
-  | `is:error` `is:warning` `is:problem` `is:running` `is:auto` `is:manual` `is:deleting` | computed state |
+### Built for scale
+- Live updates (Argo CD watch stream, Kubernetes watches) — no polling.
+- **Instant search** over tens of thousands of apps (virtualized lists), per-tab queries,
+  query language below, **saved searches** and **favorites** (★, `is:favorite`).
+- **On-disk cache**: the last known state of every instance shows immediately on launch,
+  even offline, while the live data refreshes in the background.
+- **⌘P command palette**: jump to any app, ApplicationSet, workflow, rollout or event source,
+  recent items and favorites first, plus app-wide commands.
 
-  Shortcuts: `⌘B` toggle sidebar · `⌘K` or `/` search · `↑/↓` or `j/k` move · `Enter` open · `Space` select ·
-  `⌘A` select all results · `Esc` clear.
-- **Visible errors**: every app gets a list of problems that says *what* failed
-  and *why*: failed sync operation and each failed resource/hook with its
-  message, `*Error` conditions, sync retries, Degraded resources (on Argo CD 3.x
-  the resource tree is fetched automatically so the pod reason, e.g.
-  `CrashLoopBackOff` / `ImagePullBackOff`, is shown), unreachable clusters,
-  ApplicationSet generation errors, stuck deletions.
-  The **Problems** tab groups identical failures across apps ("group by cause").
-- **Bulk actions** with per-app results: Sync (prune / dry-run / force /
-  apply-out-of-sync-only), Refresh, Hard refresh, Restart (all Deployments,
-  StatefulSets, DaemonSets and Rollouts), Terminate operation. Group headers
-  (by ApplicationSet, cluster, project, instance) can be selected as a whole.
-- **Application view like Argo CD**: full-page detail with a **Tree** tab (resource
-  graph Application → Deployment → ReplicaSet → Pod, edges highlighted in red on the
-  failing path, collapse/expand, filter, "only unhealthy", zoom with ⌘+wheel and
-  Fit, side panel per resource with health message, info, restart and **live logs**
-  — pod or whole workload, container picker, follow, previous container, filter,
-  error highlighting; double-click a pod to open its logs), plus
-  **Summary** and **Resources** tabs.
-- **Instant startup with an on-disk cache**: the last known state of every instance
-  (apps, ApplicationSets, clusters, failure explanations) is shown immediately on
-  launch — even when the server is unreachable — while the live list + watch refresh
-  it in the background. Stored gzip-compressed (`0600`) next to the config.
-- **Pod terminal** through the Argo CD web terminal (xterm.js), container picker.
-- **Diff** live (cluster) vs desired (Git) for the whole app and per resource,
-  unified with collapsed context or full manifests.
-- **Kubernetes events** for the app and per resource (warnings first, auto-refresh).
-- **Per-resource actions**: every action Argo CD exposes (restart, pause, resume,
-  scale…), view/edit the live manifest, delete (foreground / force / orphan).
-- **Sync policy**: auto-sync, prune and self-heal per app or in bulk.
-- **Edit the app**: Helm values / parameters / value files / release name, Kustomize
-  images and name prefix/suffix, target revision, or the full spec as YAML
-  (validated by Argo CD). Changes on ApplicationSet-generated apps show whether the
-  ApplicationSet will revert them (`ignoreApplicationDifferences`, `applicationsSync`).
-- **History & rollback**: every deploy with its commit message, author and date;
-  roll back to any previous deploy (prune optional).
-- **Delete** apps (cascade foreground/background or keep resources) from the app
-  page or in bulk, with typed confirmation.
-- **ApplicationSet page**: generated apps, generators, spec, conditions, bulk
-  sync/refresh/restart of all its apps, delete (warns about generated apps).
-- **Per-tab search**: Applications, Problems, ApplicationSets and Clusters each
-  keep their own query.
-- **Settings** (⚙): manage instances (add, import from argocd CLI, edit, log in),
-  appearance, and a read-only view of each instance's Argo CD configuration
-  (repositories with connection status, projects, accounts, clusters, settings).
-- **List or Tiles** for the applications page (tiles mirror the Argo CD cards).
-- Collapsible / resizable sidebar (⌘B).
-- Argo CD look & feel, light and dark themes.
+### Failures explained
+- Every object carries a list of problems saying *what* failed and *why*: failed sync and each
+  failed resource/hook, `*Error` conditions, sync retries, Degraded resources with the pod reason
+  (CrashLoopBackOff, ImagePullBackOff…), unreachable clusters, ApplicationSet generation errors,
+  failed workflow steps with their message, aborted rollouts, unhealthy event sources and sensors.
+- **Problems** tab groups identical failures across apps ("group by cause").
+- **Desktop notifications** when something starts failing (and optionally recovers), batched;
+  click to open it.
+
+### Argo CD operations
+- Application page like Argo CD: **Tree** (resource graph, failing path in red, zoom, filter),
+  Summary, Resources, **Diff** (live vs desired), **Events**, **Parameters**, **Manifest** (YAML),
+  **History & rollback** (commit message, author, date).
+- Per resource: details, **logs** (pod or whole workload, follow, previous, filter), **terminal**
+  (Argo CD web terminal), live manifest view/edit, diff, events, every resource action, delete,
+  sync only this resource.
+- **Bulk actions** with per-app results: sync (prune / dry-run / force / out-of-sync only),
+  selected-resources sync, refresh, hard refresh, restart, terminate, sync policy, delete.
+- **Create applications**, edit Helm values / parameters / Kustomize images / target revision,
+  sync policy (auto-sync, prune, self-heal), **sync windows**, **Argo CD Image Updater** annotations.
+  Edits on ApplicationSet-generated apps warn when the ApplicationSet will revert them.
+- **ApplicationSet page**: generated apps, generators, spec, conditions, bulk actions, delete.
+- **Argo CD configuration** in Settings: connect/remove repositories, create/edit/delete projects,
+  rename/remove clusters, generate/revoke account tokens.
+
+### Desktop niceties
+- Collapsible / resizable sidebar (⌘B), list or tiles, light and dark themes, Argo CD look & feel.
+- Daily update check against GitHub Releases (opt-out in Settings).
+
+### Query language
+| Query | Meaning |
+|---|---|
+| `payments api` | free text over name, appset, project, cluster, namespace, repo, path, labels (AND) |
+| `"exact phrase"`, `-legacy` | phrase / negation (works on every term) |
+| `appset:"x"` (quoted = exact) `project:x` `cluster:x` `ns:x` `repo:x` `rev:main` `ctx:prod` `name:x` | field filters |
+| `health:degraded` `sync:outofsync` `label:team=core` | status / labels |
+| `is:error` `is:warning` `is:problem` `is:running` `is:auto` `is:manual` `is:deleting` `is:favorite` | computed state |
+| Workflows / Rollouts / Events: `phase:failed` `template:x` `cron:x` `app:x` `ns:x` `cluster:x` `is:error` | |
+
+Shortcuts: `⌘P` palette · `⌘K` or `/` search · `⌘B` sidebar · `↑/↓` `j/k` move · `Enter` open ·
+`Space` select · `⌘A` select all · `Esc` back.
 
 ## Authentication
 
@@ -102,8 +100,9 @@ Secrets are stored in the OS keychain (macOS Keychain, Windows Credential
 Manager, Secret Service on Linux), falling back to a `0600` file if no
 keychain is available. Config lives in the user config dir (`syncscope/`).
 
-Not supported: `--core` mode (talking to Kubernetes directly without an Argo CD
-API server).
+**Core mode** (`argocd --core` equivalent) needs no Argo CD API server: pick a kubeconfig
+context and the Argo CD namespace; Applications and ApplicationSets are read and synced through
+Kubernetes. Resource tree, diff, rollback, resource actions and configuration need an API server.
 
 ## Development
 
@@ -139,38 +138,28 @@ MOCKARGO_URL=http://localhost:8099 go test ./internal/store -run Integration -ra
 
 ```
 main.go, app.go            Wails entry point and bindings
-internal/argocd            REST client, SSO (OIDC/PKCE), token renewal
-internal/config            contexts, keychain secrets, argocd CLI import
-internal/store             per-instance live cache, watch stream, problem detection, bulk actions
-frontend/src               React UI (data.ts = in-memory store, search.ts = query language)
-cmd/mockargo               fake Argo CD server for development
+internal/argocd            Argo CD REST client, SSO (OIDC/PKCE), terminal, generated API interface
+internal/core              argocd.API over Kubernetes (core mode)
+internal/store             Argo CD instances: live cache, problems, bulk actions, disk cache
+internal/kube              kubeconfig contexts, client-go mirrors, pods, logs, events
+internal/kubestore         Workflows / Rollouts / Events summaries, problems and actions
+internal/notify            batched desktop notifications
+internal/updater           GitHub Releases update check
+frontend/src               React UI (data.ts / kdata.ts stores, search.ts query language)
+cmd/mockargo, cmd/mockkube fake Argo CD and Kubernetes API servers for development and tests
+scripts/                   dev.sh, e2e suite (kind + real Argo CD), API generator
 ```
 
 ## Roadmap
 
-### 1. Day-to-day operations — done
-Terminal, sync policy, parameters / spec editing, diff, events, resource actions,
-live manifest edit and delete are implemented (see Features).
+Done: the whole original roadmap (Argo CD parity items, Workflows, Rollouts, Events, core mode,
+notifications, palette, cache, CI/release pipeline). Next ideas:
 
-Next in this area: create applications, sync of selected resources only,
-sync windows, image updater integration, "open a PR instead of editing the spec".
-
-### 2. Distribution and quality
-- Signed and notarized macOS builds; Windows and Linux builds.
-- Release pipeline (GitHub Actions) and in-app auto-update.
-- End-to-end tests against a real Argo CD in kind, frontend tests.
-
-### 3. Productivity
-- Desktop notifications when an app starts failing / a sync fails.
-- Saved searches and favorites, recent apps, command palette.
-- Edit Argo CD configuration from Settings (repositories, projects, clusters, accounts).
-- `--core` mode (talk to Kubernetes directly).
-
-### 4. Other Argo projects
-- **Argo Workflows** (workflows, templates, logs), **Argo Rollouts** (canary /
-  blue-green status, promote, abort), **Argo Events** (event sources, sensors).
-
-<!-- distribution & quality (phase 2) -->
+- Open a pull request instead of editing the app spec (GitHub / GitLab).
+- Argo Workflows: retry (needs argo-server), artifacts download, archived workflows.
+- Argo Rollouts: AnalysisRuns / Experiments details, rollout history.
+- Argo Events: live event stream per EventSource.
+- Signed and notarized macOS builds published from CI (needs an Apple Developer ID).
 
 ## Install
 

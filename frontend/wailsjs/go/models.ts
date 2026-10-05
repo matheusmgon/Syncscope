@@ -389,6 +389,8 @@ export namespace config {
 	    username?: string;
 	    color?: string;
 	    disabled?: boolean;
+	    kubeContext?: string;
+	    namespace?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Context(source);
@@ -410,12 +412,16 @@ export namespace config {
 	        this.username = source["username"];
 	        this.color = source["color"];
 	        this.disabled = source["disabled"];
+	        this.kubeContext = source["kubeContext"];
+	        this.namespace = source["namespace"];
 	    }
 	}
 	export class Prefs {
 	    theme?: string;
 	    kubeContexts?: string[];
 	    noUpdateCheck?: boolean;
+	    notifyOff?: boolean;
+	    notifyRecoveries?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Prefs(source);
@@ -426,6 +432,8 @@ export namespace config {
 	        this.theme = source["theme"];
 	        this.kubeContexts = source["kubeContexts"];
 	        this.noUpdateCheck = source["noUpdateCheck"];
+	        this.notifyOff = source["notifyOff"];
+	        this.notifyRecoveries = source["notifyRecoveries"];
 	    }
 	}
 
@@ -672,6 +680,45 @@ export namespace kubestore {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace main {
+	
+	export class NotifyPrefs {
+	    enabled: boolean;
+	    recoveries: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NotifyPrefs(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.recoveries = source["recoveries"];
+	    }
+	}
+	export class UpdateInfo {
+	    tag: string;
+	    url: string;
+	    assetUrl: string;
+	    notes: string;
+	    publishedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tag = source["tag"];
+	        this.url = source["url"];
+	        this.assetUrl = source["assetUrl"];
+	        this.notes = source["notes"];
+	        this.publishedAt = source["publishedAt"];
+	    }
 	}
 
 }
@@ -1350,54 +1397,6 @@ export namespace store {
 	        this.pod = source["pod"];
 	        this.container = source["container"];
 	    }
-	}
-
-}
-
-export namespace updater {
-	
-	export class Release {
-	    tag: string;
-	    version: string;
-	    url: string;
-	    // Go type: time
-	    publishedAt: any;
-	    notes: string;
-	    assetUrl: string;
-	    assetName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Release(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.tag = source["tag"];
-	        this.version = source["version"];
-	        this.url = source["url"];
-	        this.publishedAt = this.convertValues(source["publishedAt"], null);
-	        this.notes = source["notes"];
-	        this.assetUrl = source["assetUrl"];
-	        this.assetName = source["assetName"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }

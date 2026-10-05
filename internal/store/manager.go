@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"syncscope/internal/argocd"
 	"syncscope/internal/config"
+	"syncscope/internal/core"
 )
 
 // Emitter pushes events to the UI.
@@ -56,6 +58,8 @@ type Manager struct {
 	emit Emitter
 	// OpenBrowser is used by the SSO flow.
 	OpenBrowser func(string)
+	// OnTransition is called for live (watch) updates of an app already known.
+	OnTransition func(prev, cur AppSummary)
 
 	mu    sync.RWMutex
 	conns map[string]*conn
@@ -228,6 +232,23 @@ func (m *Manager) Reconnect(id string) error {
 }
 
 func (m *Manager) Test(c config.Context) (string, error) {
+	if c.AuthType == config.AuthCore {
+		cc, err := core.New(c.KubeContext, c.Namespace)
+		if err != nil {
+			return "", err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		v, err := cc.Version(ctx)
+		if err != nil {
+			return "", err
+		}
+		list, err := cc.ListApplications(ctx)
+		if err != nil {
+			return "", fmt.Errorf("%s, but listing Applications failed: %w", v, err)
+		}
+		return fmt.Sprintf("%s · %d Applications in %s", v, len(list.Items), c.Namespace), nil
+	}
 	cl, err := argocd.NewClient(c.ClientOptions(), argocd.Credentials{}, nil)
 	if err != nil {
 		return "", err

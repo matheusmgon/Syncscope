@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { argocd, config, kubestore, store } from '../../wailsjs/go/models'
+import { argocd, config, kubestore, main, store } from '../../wailsjs/go/models'
 import * as API from '../../wailsjs/go/main/App'
 
 type Tab = 'instances' | 'appearance' | 'argocd' | 'kube'
@@ -110,7 +110,8 @@ export function Settings(p: Props) {
                     <button className={p.view === 'tiles' ? 'on' : ''} onClick={() => p.setView('tiles')}>▦ Tiles</button>
                   </div>
                 </div>
-                <div className="help">Shortcuts: ⌘K search · ⌘B toggle sidebar · ↑↓ / j k move · Enter open · Space select · ⌘A select all · Esc back</div>
+                <NotificationSettings />
+                <div className="help">Shortcuts: ⌘P command palette · ⌘K search · ⌘B toggle sidebar · ↑↓ / j k move · Enter open · Space select · ⌘A select all · Esc back</div>
               </div>
             )}
             {tab === 'argocd' && <ArgoConfigView statuses={p.statuses} notify={p.notify} />}
@@ -514,6 +515,35 @@ function KubeContextsView({ notify }: { notify: (m: string, ok: boolean) => void
         </tbody>
       </table>
       {list && !list.length && <div className="help">No contexts found in the kubeconfig.</div>}
+    </>
+  )
+}
+
+function NotificationSettings() {
+  const [n, setN] = useState<{ enabled: boolean; recoveries: boolean } | null>(null)
+  const [upd, setUpd] = useState<boolean | null>(null)
+  const [version, setVersion] = useState('')
+  useEffect(() => {
+    API.NotificationPrefs().then(setN)
+    API.UpdateCheckEnabled().then(setUpd)
+    API.Version().then(setVersion)
+  }, [])
+  const save = (next: { enabled: boolean; recoveries: boolean }) => { setN(next); API.SetNotificationPrefs(main.NotifyPrefs.createFrom(next)) }
+  if (!n) return null
+  return (
+    <>
+      <div className="field">
+        <label>Desktop notifications</label>
+        <label className="check"><input type="checkbox" checked={n.enabled} onChange={(e) => save({ ...n, enabled: e.target.checked })} /> notify when an app, sync, workflow, rollout or event source starts failing</label>
+        <label className="check" style={{ opacity: n.enabled ? 1 : 0.5 }}><input type="checkbox" disabled={!n.enabled} checked={n.recoveries} onChange={(e) => save({ ...n, recoveries: e.target.checked })} /> also when it recovers</label>
+        <div><button className="btn sm" onClick={() => API.TestNotification()}>Send a test notification</button></div>
+        <span className="hint">Events within 5 seconds are grouped into one notification. Unsigned development builds may only show them inside the app.</span>
+      </div>
+      <div className="field">
+        <label>Updates</label>
+        <label className="check"><input type="checkbox" checked={!!upd} disabled={upd === null} onChange={(e) => { setUpd(e.target.checked); API.SetUpdateCheck(e.target.checked) }} /> check GitHub Releases once a day</label>
+        <span className="hint">Syncscope {version}</span>
+      </div>
     </>
   )
 }

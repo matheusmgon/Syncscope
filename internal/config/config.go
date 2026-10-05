@@ -22,6 +22,7 @@ const (
 	AuthPassword = "password" // local account (argocd login --username/--password)
 	AuthToken    = "token"    // API/project token (argocd --auth-token)
 	AuthCLI      = "cli"      // credentials imported from ~/.config/argocd/config
+	AuthCore     = "core"     // no API server: Applications read via Kubernetes (argocd --core)
 )
 
 // Context is one Argo CD API server the user manages.
@@ -40,6 +41,9 @@ type Context struct {
 	Username       string            `json:"username,omitempty"`
 	Color          string            `json:"color,omitempty"`
 	Disabled       bool              `json:"disabled,omitempty"`
+	// core mode
+	KubeContext string `json:"kubeContext,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
 }
 
 func (c Context) ClientOptions() argocd.Options {
@@ -55,6 +59,9 @@ type Prefs struct {
 	KubeContexts []string `json:"kubeContexts,omitempty"`
 	// disable the daily GitHub Releases check
 	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
+	// desktop notifications
+	NotifyOff        bool `json:"notifyOff,omitempty"`
+	NotifyRecoveries bool `json:"notifyRecoveries,omitempty"`
 }
 
 type file struct {
@@ -152,6 +159,15 @@ func NewID() string {
 // Upsert stores a context, assigning an ID if new.
 func (s *Store) Upsert(c Context) (Context, error) {
 	c.Server = strings.TrimRight(strings.TrimSpace(c.Server), "/")
+	if c.AuthType == AuthCore {
+		if c.KubeContext == "" {
+			return c, errors.New("pick a kubeconfig context for core mode")
+		}
+		if c.Namespace == "" {
+			c.Namespace = "argocd"
+		}
+		c.Server = "kube://" + c.KubeContext + "/" + c.Namespace
+	}
 	if c.Server == "" {
 		return c, errors.New("server URL is required")
 	}
@@ -203,6 +219,14 @@ func (s *Store) Prefs() Prefs {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.data.Prefs
+}
+
+// UpdatePrefs changes some preferences atomically.
+func (s *Store) UpdatePrefs(f func(p *Prefs)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f(&s.data.Prefs)
+	return s.saveLocked()
 }
 
 func (s *Store) SetPrefs(p Prefs) error {

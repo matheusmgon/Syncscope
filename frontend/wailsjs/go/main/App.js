@@ -190,6 +190,10 @@ export function NewAppTemplate(arg1) {
   return window['go']['main']['App']['NewAppTemplate'](arg1);
 }
 
+export function NotificationPrefs() {
+  return window['go']['main']['App']['NotificationPrefs']();
+}
+
 export function OpenInArgo(arg1) {
   return window['go']['main']['App']['OpenInArgo'](arg1);
 }
@@ -282,12 +286,20 @@ export function SetKubeContexts(arg1) {
   return window['go']['main']['App']['SetKubeContexts'](arg1);
 }
 
+export function SetNotificationPrefs(arg1) {
+  return window['go']['main']['App']['SetNotificationPrefs'](arg1);
+}
+
 export function SetPrefs(arg1) {
   return window['go']['main']['App']['SetPrefs'](arg1);
 }
 
 export function SetSyncPolicy(arg1, arg2) {
   return window['go']['main']['App']['SetSyncPolicy'](arg1, arg2);
+}
+
+export function SetUpdateCheck(arg1) {
+  return window['go']['main']['App']['SetUpdateCheck'](arg1);
 }
 
 export function StartLogs(arg1, arg2) {
@@ -332,6 +344,14 @@ export function Terminate(arg1) {
 
 export function TestContext(arg1) {
   return window['go']['main']['App']['TestContext'](arg1);
+}
+
+export function TestNotification() {
+  return window['go']['main']['App']['TestNotification']();
+}
+
+export function UpdateCheckEnabled() {
+  return window['go']['main']['App']['UpdateCheckEnabled']();
 }
 
 export function UpdateClusterMeta(arg1, arg2, arg3, arg4) {

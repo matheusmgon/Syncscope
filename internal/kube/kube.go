@@ -272,8 +272,9 @@ func StripNoise(o map[string]any) {
 }
 
 // IsForbidden / IsNotFound helpers for callers.
-func IsForbidden(err error) bool { return apierrors.IsForbidden(err) }
-func IsNotFound(err error) bool  { return apierrors.IsNotFound(err) || errors.Is(err, ErrNotInstalled) }
+func IsForbidden(err error) bool     { return apierrors.IsForbidden(err) }
+func IsNotFound(err error) bool      { return apierrors.IsNotFound(err) || errors.Is(err, ErrNotInstalled) }
+func IsAlreadyExists(err error) bool { return apierrors.IsAlreadyExists(err) }
 
 // ShortErr trims verbose Kubernetes errors for the UI.
 func ShortErr(err error) string {

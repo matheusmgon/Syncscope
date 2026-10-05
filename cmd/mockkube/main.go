@@ -45,6 +45,7 @@ var (
 var kindOf = map[string]string{
 	"rollouts": "Rollout", "workflows": "Workflow", "workflowtemplates": "WorkflowTemplate", "cronworkflows": "CronWorkflow",
 	"eventsources": "EventSource", "sensors": "Sensor", "eventbus": "EventBus", "pods": "Pod", "events": "Event",
+	"applications": "Application", "applicationsets": "ApplicationSet",
 }
 
 func nextRV() string { rv++; return fmt.Sprint(rv) }
@@ -182,6 +183,31 @@ func seed() {
 		}
 		phase := []string{"Succeeded", "Succeeded", "Failed", "Running", "Succeeded", "Error", "Succeeded", "Running"}[i%8]
 		put("workflows", workflowObj("argo", n, labels, t, phase, time.Duration(i)*17*time.Minute))
+	}
+
+	// Argo CD Applications (for core mode)
+	put("applicationsets", obj{"metadata": meta("argocd", "guestbook-set", nil), "spec": obj{"generators": []obj{{"list": obj{"elements": []obj{}}}}},
+		"status": obj{"conditions": []obj{{"type": "ErrorOccurred", "status": "False"}}}})
+	for i := 0; i < 40; i++ {
+		n := fmt.Sprintf("core-app-%02d", i)
+		md := meta("argocd", n, nil)
+		if i%2 == 0 {
+			md["ownerReferences"] = []obj{{"apiVersion": "argoproj.io/v1alpha1", "kind": "ApplicationSet", "name": "guestbook-set"}}
+		}
+		health, sync := "Healthy", "Synced"
+		if i%7 == 3 {
+			health = "Degraded"
+		}
+		if i%5 == 1 {
+			sync = "OutOfSync"
+		}
+		put("applications", obj{"metadata": md, "spec": obj{"project": "default",
+			"source":      obj{"repoURL": "https://github.com/argoproj/argocd-example-apps.git", "path": "guestbook", "targetRevision": "HEAD"},
+			"destination": obj{"server": "https://kubernetes.default.svc", "namespace": n}},
+			"status": obj{"sync": obj{"status": sync, "revision": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"}, "health": obj{"status": health},
+				"resources": []obj{{"group": "apps", "version": "v1", "kind": "Deployment", "namespace": n, "name": "guestbook-ui", "status": sync, "health": obj{"status": health, "message": map[bool]string{true: "Deployment \"guestbook-ui\" exceeded its progress deadline"}[health == "Degraded"]}},
+					{"version": "v1", "kind": "Service", "namespace": n, "name": "guestbook-ui", "status": "Synced", "health": obj{"status": "Healthy"}}},
+				"operationState": obj{"phase": "Succeeded", "message": "successfully synced", "finishedAt": ts(time.Duration(i) * time.Hour)}}})
 	}
 
 	// Argo Events
@@ -535,6 +561,28 @@ func reconcile(res string, o obj) {
 		o["status"] = st
 	}
 	switch res {
+	case "applications":
+		md := o["metadata"].(obj)
+		if an, ok := md["annotations"].(obj); ok && an["argocd.argoproj.io/refresh"] != nil {
+			delete(an, "argocd.argoproj.io/refresh")
+			st["reconciledAt"] = time.Now().UTC().Format(time.RFC3339)
+		}
+		if op, ok := o["operation"].(obj); ok && op != nil {
+			st["operationState"] = obj{"phase": "Running", "message": "syncing", "operation": op, "startedAt": time.Now().UTC().Format(time.RFC3339)}
+			delete(o, "operation")
+			ns, n := md["namespace"].(string), md["name"].(string)
+			go func() {
+				time.Sleep(2 * time.Second)
+				mu.Lock()
+				defer mu.Unlock()
+				if a, ok := db["applications"][ns+"/"+n]; ok {
+					ast := a["status"].(obj)
+					ast["operationState"] = obj{"phase": "Succeeded", "message": "successfully synced (all tasks run)", "finishedAt": time.Now().UTC().Format(time.RFC3339)}
+					ast["sync"].(obj)["status"] = "Synced"
+					put("applications", a)
+				}
+			}()
+		}
 	case "workflows":
 		if sd, _ := spec["shutdown"].(string); sd != "" && st["phase"] == "Running" {
 			st["phase"], st["message"] = "Failed", "Stopped with strategy '"+sd+"'"

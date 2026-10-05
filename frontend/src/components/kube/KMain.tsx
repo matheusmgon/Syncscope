@@ -3,6 +3,7 @@ import { useKData } from '../../kdata'
 import { WorkflowsView, WorkflowPage, TemplatePage, CronPage } from './Workflows'
 import { RolloutsView, RolloutPage } from './Rollouts'
 import { EventsView, EventObjPage } from './Events'
+import { SavedSearches } from '../SavedSearches'
 
 export type Product = 'cd' | 'workflows' | 'rollouts' | 'events'
 
@@ -57,6 +58,7 @@ export function KMain({ product, query, setQuery, ctxFilter, onOpen }: {
             {query && <button className="x" style={{ fontSize: 14 }} onClick={() => setQuery('')}>✕</button>}
             <span className="kbd">⌘K</span>
           </div>
+          <SavedSearches scope={product} query={query} setQuery={setQuery} />
         </div>
         <div className="tabs"><div className="tab active">{title[product]}</div></div>
       </div>

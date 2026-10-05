@@ -12,7 +12,7 @@ import (
 	"syncscope/internal/argocd"
 )
 
-func (m *Manager) client(ctxID string) (*argocd.Client, error) {
+func (m *Manager) client(ctxID string) (argocd.API, error) {
 	c, err := m.conn(ctxID)
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import { EventsView } from '../EventsView'
 import { YamlEditor } from '../YamlEditor'
 import { ProblemList } from '../Problems'
 import type { KObj } from '../../kdata'
+import { toggleFavorite, usePrefs } from '../../userprefs'
 
 // ---- phases ---------------------------------------------------------------------------
 
@@ -173,6 +174,7 @@ export function KPage({ obj, left, onClose, icon, actions, tabs, subtitle }: {
   const all = [...tabs, eventsTab, yamlTab]
   const [tab, setTab] = useState(all[0].id)
   const [showProblems, setShowProblems] = useState(true)
+  const prefs = usePrefs()
   const current = all.find((t) => t.id === tab) ?? all[0]
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.modal-backdrop') && onClose()
@@ -186,6 +188,7 @@ export function KPage({ obj, left, onClose, icon, actions, tabs, subtitle }: {
         <h2>
           <span className="kicon" style={{ width: 28, height: 28, fontSize: 8 }}>{icon}</span>
           <span className="selectable">{obj.name}</span>
+          <span className={'star big' + (prefs.favorites.has(obj.key) ? ' on' : '')} onClick={() => toggleFavorite(obj.key)} title="Favorite">★</span>
           <PhasePill kind={obj.kind} phase={obj.phase} />
           <button className="btn ghost sm back" onClick={onClose}>← Back</button>
         </h2>

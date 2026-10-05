@@ -1,4 +1,5 @@
 import type { App } from './data'
+import { isFavorite } from './userprefs'
 
 /*
   Query language (all terms AND-ed, case-insensitive):
@@ -77,6 +78,7 @@ function test(a: App, t: Term, ctxNames: Map<string, string>, extra?: (a: App) =
         case 'running': case 'syncing': return a.opPhase === 'Running'
         case 'deleting': return a.deleting
         case 'outofsync': return a.sync === 'OutOfSync'
+        case 'favorite': case 'fav': case 'starred': return isFavorite(a.key)
       }
       return false
     default:

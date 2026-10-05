@@ -10,6 +10,7 @@ import (
 	"syncscope/internal/config"
 	"syncscope/internal/kube"
 	"syncscope/internal/kubestore"
+	"syncscope/internal/notify"
 	"syncscope/internal/store"
 	"syncscope/internal/updater"
 )
@@ -20,6 +21,7 @@ type App struct {
 	cfg *config.Store
 	m   *store.Manager
 	k   *kubestore.Manager
+	n   *notify.Notifier
 }
 
 func NewApp(cfg *config.Store) *App {
@@ -39,6 +41,7 @@ func (a *App) startup(ctx context.Context) {
 	a.m.Start(ctx)
 	a.k = kubestore.NewManager(a.cfg, func(ev string, data any) { runtime.EventsEmit(ctx, ev, data) })
 	a.k.Start(ctx)
+	a.setupNotifications(ctx)
 	go a.updateLoop(ctx)
 }
 
@@ -191,15 +194,28 @@ func (a *App) RestartPods(key string) (int, error)           { return a.k.Restar
 
 func (a *App) Version() string { return version }
 
+// UpdateInfo is the UI view of an available release.
+type UpdateInfo struct {
+	Tag         string `json:"tag"`
+	URL         string `json:"url"`
+	AssetURL    string `json:"assetUrl"`
+	Notes       string `json:"notes"`
+	PublishedAt string `json:"publishedAt"`
+}
+
 // CheckForUpdate asks GitHub Releases for a newer version (nil when up to date,
 // for dev builds, or when no repository is configured).
-func (a *App) CheckForUpdate() (*updater.Release, error) {
+func (a *App) CheckForUpdate() (*UpdateInfo, error) {
 	if updateRepo == "" {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return updater.Check(ctx, updateRepo, version)
+	r, err := updater.Check(ctx, updateRepo, version)
+	if err != nil || r == nil {
+		return nil, err
+	}
+	return &UpdateInfo{Tag: r.Tag, URL: r.URL, AssetURL: r.AssetURL, Notes: r.Notes, PublishedAt: r.PublishedAt.Format(time.RFC3339)}, nil
 }
 
 func (a *App) updateLoop(ctx context.Context) {
@@ -254,4 +270,100 @@ func (a *App) CreateToken(ctxID, account, id string, expiresInSeconds int64) (st
 }
 func (a *App) DeleteToken(ctxID, account, id string) error {
 	return a.m.DeleteToken(ctxID, account, id)
+}
+
+// ---- desktop notifications ----
+
+var kindProduct = map[string]string{
+	"Workflow": "workflows", "CronWorkflow": "workflows", "WorkflowTemplate": "workflows",
+	"Rollout": "rollouts", "EventSource": "events", "Sensor": "events", "EventBus": "events",
+}
+
+func firstProblem(msgs ...string) string {
+	for _, m := range msgs {
+		if m != "" {
+			return m
+		}
+	}
+	return ""
+}
+
+func (a *App) setupNotifications(ctx context.Context) {
+	native := runtime.InitializeNotifications(ctx) == nil && runtime.IsNotificationAvailable(ctx)
+	if native {
+		runtime.OnNotificationResponse(ctx, func(r runtime.NotificationResult) {
+			if key, _ := r.Response.UserInfo["key"].(string); key != "" {
+				runtime.WindowShow(ctx)
+				runtime.EventsEmit(ctx, "notify:open", map[string]any{"key": key, "product": r.Response.UserInfo["product"]})
+			}
+		})
+	}
+	enabled := func() (bool, bool) {
+		p := a.cfg.Prefs()
+		return !p.NotifyOff, !p.NotifyOff && p.NotifyRecoveries
+	}
+	a.n = notify.New(5*time.Second, enabled, func(m notify.Message) {
+		// always shown in-app; natively when the OS allows it
+		runtime.EventsEmit(ctx, "notify:message", m)
+		if native {
+			_ = runtime.SendNotification(ctx, runtime.NotificationOptions{ID: m.ID, Title: m.Title, Subtitle: m.Subtitle, Body: m.Body,
+				Data: map[string]any{"key": m.Key, "product": m.Product}})
+		}
+	})
+	a.m.OnTransition = func(prev, cur store.AppSummary) {
+		switch {
+		case cur.Severity == 2 && prev.Severity < 2:
+			d := ""
+			if len(cur.Problems) > 0 {
+				d = cur.Problems[0].Message
+			}
+			a.n.Push(notify.Event{Key: cur.Key, Product: "cd", Title: cur.Name, Detail: d})
+		case prev.OpPhase == "Running" && (cur.OpPhase == "Failed" || cur.OpPhase == "Error"):
+			a.n.Push(notify.Event{Key: cur.Key, Product: "cd", Title: cur.Name, Detail: "sync failed: " + cur.OpMessage})
+		case prev.Severity == 2 && cur.Severity == 0:
+			a.n.Push(notify.Event{Key: cur.Key, Product: "cd", Title: cur.Name, Detail: "healthy and synced again", Good: true})
+		}
+	}
+	a.k.OnTransition = func(prev, cur kubestore.Obj) {
+		prod := kindProduct[cur.Kind]
+		if prod == "" {
+			return
+		}
+		switch {
+		case cur.Severity == 2 && prev.Severity < 2:
+			d := ""
+			if len(cur.Problems) > 0 {
+				d = firstProblem(cur.Problems[0].Message, cur.Message)
+			}
+			a.n.Push(notify.Event{Key: cur.Key, Product: prod, Title: cur.Kind + " " + cur.Name, Detail: d})
+		case prev.Severity == 2 && cur.Severity == 0:
+			a.n.Push(notify.Event{Key: cur.Key, Product: prod, Title: cur.Kind + " " + cur.Name, Detail: "recovered", Good: true})
+		}
+	}
+}
+
+type NotifyPrefs struct {
+	Enabled    bool `json:"enabled"`
+	Recoveries bool `json:"recoveries"`
+}
+
+func (a *App) NotificationPrefs() NotifyPrefs {
+	p := a.cfg.Prefs()
+	return NotifyPrefs{Enabled: !p.NotifyOff, Recoveries: p.NotifyRecoveries}
+}
+
+func (a *App) SetNotificationPrefs(n NotifyPrefs) error {
+	if n.Enabled {
+		_, _ = runtime.RequestNotificationAuthorization(a.ctx)
+	}
+	return a.cfg.UpdatePrefs(func(p *config.Prefs) { p.NotifyOff, p.NotifyRecoveries = !n.Enabled, n.Recoveries })
+}
+
+func (a *App) TestNotification() {
+	a.n.Push(notify.Event{Key: "", Product: "cd", Title: "Syncscope", Detail: "Notifications are working"})
+}
+
+func (a *App) UpdateCheckEnabled() bool { return !a.cfg.Prefs().NoUpdateCheck && updateRepo != "" }
+func (a *App) SetUpdateCheck(on bool) error {
+	return a.cfg.UpdatePrefs(func(p *config.Prefs) { p.NoUpdateCheck = !on })
 }

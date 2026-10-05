@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { App } from '../data'
 import type { SortKey } from '../search'
 import { HealthIcon, StatBar, SyncIcon, ago } from './Status'
+import { toggleFavorite, usePrefs } from '../userprefs'
 
 export type GroupBy = 'none' | 'appset' | 'cluster' | 'project' | 'ctx'
 
@@ -37,6 +38,7 @@ function q(v: string) {
 }
 
 export function AppTable(p: Props) {
+  const prefs = usePrefs()
   const body = useRef<HTMLDivElement>(null)
   const [scroll, setScroll] = useState(0)
   const [height, setHeight] = useState(800)
@@ -204,6 +206,7 @@ export function AppTable(p: Props) {
                 <HealthIcon status={a.health} />
                 <SyncIcon status={a.sync} running={a.opPhase === 'Running'} />
                 <div className="cell name" title={a.name}>
+                  <span className={'star' + (prefs.favorites.has(a.key) ? ' on' : '')} onClick={(e) => { e.stopPropagation(); toggleFavorite(a.key) }} title="Favorite">★</span>
                   {a.name}
                   {p.groupBy !== 'ctx' && p.ctxNames.size > 1 && <span className="sub">{p.ctxNames.get(a.ctx)}</span>}
                 </div>

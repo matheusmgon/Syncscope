@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { argocd, config, store } from '../../wailsjs/go/models'
+import { argocd, config, kubestore, store } from '../../wailsjs/go/models'
 import * as API from '../../wailsjs/go/main/App'
 
 function Modal({ title, children, footer, onClose }: { title: string; children: React.ReactNode; footer: React.ReactNode; onClose: () => void }) {
@@ -24,6 +24,7 @@ const authHelp: Record<string, string> = {
   password: 'Local Argo CD account (e.g. admin), just like `argocd login --username`.',
   token: 'API token of a local account or a project role (`argocd account generate-token` / `argocd proj role create-token`).',
   cli: 'Uses the token the argocd CLI already saved in ~/.config/argocd/config.',
+  core: 'Like `argocd --core`: no Argo CD API server. Applications are read and synced directly through Kubernetes with your kubeconfig. Resource tree, diff, rollback and configuration need an API server.',
 }
 
 const colors = ['', '#00a2b3', '#18be94', '#0dadea', '#f4c030', '#e96d76', '#766f94']
@@ -81,9 +82,9 @@ export function ContextDialog({ initial, onClose, onSaved }: { initial?: config.
             )
           )}
           <span className="spacer" />
-          <button className="btn" onClick={doTest} disabled={busy || !c.server}>Test connection</button>
+          <button className="btn" onClick={doTest} disabled={busy || (c.authType === 'core' ? !c.kubeContext : !c.server)}>Test connection</button>
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={save} disabled={busy || !c.server}>Save</button>
+          <button className="btn primary" onClick={save} disabled={busy || (c.authType === 'core' ? !c.kubeContext : !c.server)}>Save</button>
         </>
       }
     >
@@ -108,11 +109,12 @@ export function ContextDialog({ initial, onClose, onSaved }: { initial?: config.
           </div>
         </div>
       </div>
-      <div className="field">
+      {c.authType === 'core' && <CoreFields c={c} set={set} />}
+      {c.authType !== 'core' && <div className="field">
         <label>Server URL</label>
         <input type="text" value={c.server} placeholder="https://argocd.example.com" onChange={(e) => set({ server: e.target.value })} />
         <span className="hint">Include the root path if any (e.g. https://host/argocd).</span>
-      </div>
+      </div>}
       <div className="field">
         <label>Authentication</label>
         <select value={c.authType} onChange={(e) => set({ authType: e.target.value })}>
@@ -120,6 +122,7 @@ export function ContextDialog({ initial, onClose, onSaved }: { initial?: config.
           <option value="password">Username and password (local account)</option>
           <option value="token">API token</option>
           <option value="cli">Imported from argocd CLI</option>
+          <option value="core">Core mode (kubeconfig, no API server)</option>
         </select>
         <span className="hint">{authHelp[c.authType]}</span>
       </div>
@@ -136,7 +139,7 @@ export function ContextDialog({ initial, onClose, onSaved }: { initial?: config.
           </label>
         </div>
       )}
-      <details>
+      {c.authType !== 'core' && <details>
         <summary>TLS, certificates and headers</summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
           <label className="check">
@@ -163,7 +166,7 @@ export function ContextDialog({ initial, onClose, onSaved }: { initial?: config.
             <span className="hint">For proxies like Cloudflare Access / IAP (same as the CLI --header flag).</span>
           </div>
         </div>
-      </details>
+      </details>}
       {test && <div className={'alert' + (test.ok ? ' ok' : '')}>{test.msg}</div>}
     </Modal>
   )
@@ -301,7 +304,7 @@ export function ConfirmAction({ kind, names, onClose, onRun }: { kind: ActionKin
   )
 }
 
-export type Toast = { id: string; kind: 'report' | 'msg'; report?: store.ActionReport; msg?: string; ok?: boolean }
+export type Toast = { id: string; kind: 'report' | 'msg'; report?: store.ActionReport; msg?: string; ok?: boolean; detail?: string; open?: () => void }
 
 export function Toasts({ toasts, progress, onClose }: {
   toasts: Toast[]
@@ -320,8 +323,9 @@ export function Toasts({ toasts, progress, onClose }: {
       {toasts.map((t) => {
         if (t.kind === 'msg') {
           return (
-            <div key={t.id} className={'toast' + (t.ok ? '' : ' fail')}>
-              <div className="t-head">{t.msg}<button className="x" onClick={() => onClose(t.id)}>✕</button></div>
+            <div key={t.id} className={'toast' + (t.ok ? '' : ' fail') + (t.open ? ' clickable' : '')} onClick={() => { if (t.open) { t.open(); onClose(t.id) } }}>
+              <div className="t-head">{t.msg}<button className="x" onClick={(e) => { e.stopPropagation(); onClose(t.id) }}>✕</button></div>
+              {t.detail && <div className="t-body" style={{ whiteSpace: 'pre-wrap' }}>{t.detail}</div>}
             </div>
           )
         }
@@ -344,6 +348,26 @@ export function Toasts({ toasts, progress, onClose }: {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function CoreFields({ c, set }: { c: config.Context; set: (p: Partial<config.Context>) => void }) {
+  const [ctxs, setCtxs] = useState<kubestore.ContextView[]>([])
+  useEffect(() => { API.KubeContexts().then((l) => setCtxs(l ?? [])).catch(() => setCtxs([])) }, [])
+  return (
+    <div className="row2col">
+      <div className="field">
+        <label>Kubeconfig context</label>
+        <select value={c.kubeContext ?? ''} onChange={(e) => set({ kubeContext: e.target.value })}>
+          <option value="">— pick a context —</option>
+          {ctxs.map((k) => <option key={k.name} value={k.name}>{k.name}</option>)}
+        </select>
+      </div>
+      <div className="field">
+        <label>Argo CD namespace</label>
+        <input type="text" value={c.namespace ?? 'argocd'} onChange={(e) => set({ namespace: e.target.value })} />
+      </div>
     </div>
   )
 }

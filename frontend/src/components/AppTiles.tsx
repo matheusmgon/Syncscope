@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { App } from '../data'
 import { HealthIcon, SyncIcon, ago } from './Status'
+import { toggleFavorite, usePrefs } from '../userprefs'
 
 // Card grid like the Argo CD applications page, virtualized by row.
 
@@ -20,6 +21,7 @@ type Props = {
 }
 
 export function AppTiles(p: Props) {
+  const prefs = usePrefs()
   const el = useRef<HTMLDivElement>(null)
   const [scroll, setScroll] = useState(0)
   const [size, setSize] = useState({ w: 1200, h: 800 })
@@ -62,6 +64,7 @@ export function AppTiles(p: Props) {
           <div className="tile-head">
             <HealthIcon status={a.health} />
             <span className="tile-name" title={a.name}>{a.name}</span>
+            <span className={'star' + (prefs.favorites.has(a.key) ? ' on' : '')} onClick={(e) => { e.stopPropagation(); toggleFavorite(a.key) }} title="Favorite">★</span>
             <input type="checkbox" checked={p.selected.has(a.key)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(a.key)} />
           </div>
           <div className="tile-grid">

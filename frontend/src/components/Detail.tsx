@@ -5,6 +5,7 @@ import { getApp, useData } from '../data'
 import { HealthIcon, Pill, SyncIcon, ago } from './Status'
 import { ProblemList } from './Problems'
 import { ConfirmAction } from './Dialogs'
+import { toggleFavorite, usePrefs } from '../userprefs'
 import { ResourceTree } from './ResourceTree'
 import { HistoryView } from './History'
 import { AppDiff } from './DiffView'
@@ -27,6 +28,7 @@ type DetailTab = 'tree' | 'summary' | 'resources' | 'diff' | 'events' | 'paramet
 
 export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpenAppSet }: Props) {
   const [tab, setTab] = useState<DetailTab>('tree')
+  const prefs = usePrefs()
   const [showProblems, setShowProblems] = useState(true)
   const [policyOpen, setPolicyOpen] = useState(false)
   const [syncRes, setSyncRes] = useState<store.ResourceRow[] | null>(null)
@@ -92,6 +94,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
           <h2>
             <HealthIcon status={s.health} />
             <span className="selectable">{s.name}</span>
+            <span className={'star big' + (prefs.favorites.has(appKey) ? ' on' : '')} onClick={() => toggleFavorite(appKey)} title="Favorite">★</span>
             <button className="btn ghost sm back" onClick={onClose} title="Back to applications (Esc)">← Applications</button>
           </h2>
           <div className="meta">

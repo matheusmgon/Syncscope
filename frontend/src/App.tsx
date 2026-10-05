@@ -8,6 +8,10 @@ import { Settings } from './components/Settings'
 import { AppSetPage } from './components/AppSetPage'
 import { SyncPolicyDialog } from './components/Parameters'
 import { CreateAppDialog } from './components/CreateApp'
+import { Palette, type PaletteItem } from './components/Palette'
+import { SavedSearches } from './components/SavedSearches'
+import { pushRecent } from './userprefs'
+import { EventsOn } from '../wailsjs/runtime/runtime'
 import { startKData } from './kdata'
 import { KMain, KPageRouter, type Product } from './components/kube/KMain'
 import { AppTable, type GroupBy } from './components/AppTable'
@@ -68,11 +72,15 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bulkPolicy, setBulkPolicy] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [palette, setPalette] = useState(false)
   const [product, setProduct] = useState<Product>(() => load('product', 'cd'))
   const [kctxF, setKctxF] = useState<Set<string>>(new Set())
   const [kq, setKq] = useState<Record<string, string>>({})
   const [kPage, setKPage] = useState<string | null>(null)
   useEffect(() => save('product', product), [product])
+  useEffect(() => { if (detail) { const a = data.apps.get(detail); if (a) pushRecent(detail, a.name, 'cd') } }, [detail]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (kPage) pushRecent(kPage, kPage.split('/').pop() ?? kPage, 'k') }, [kPage])
+  useEffect(() => { if (appSetPage) pushRecent(appSetPage, appSetPage.split('/').pop() ?? appSetPage, 'appset') }, [appSetPage])
   const [contexts, setContexts] = useState<config.Context[]>([])
   const [editCtx, setEditCtx] = useState<config.Context | 'new' | null>(null)
   const [loginCtx, setLoginCtx] = useState<config.Context | null>(null)
@@ -134,6 +142,31 @@ export default function App() {
     if (ok) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000)
   }, [])
 
+  const openKey = useCallback((key: string) => {
+    if (!key) return
+    if (key.split('|').length === 3) { setDetail(null); setAppSetPage(null); setProduct((p) => (p === 'cd' ? 'workflows' : p)); setKPage(key); return }
+    setKPage(null); setProduct('cd'); setDetail(key)
+  }, [])
+
+  useEffect(() => {
+    const offMsg = EventsOn('notify:message', (m: { title: string; subtitle?: string; body?: string; key?: string; product?: string }) => {
+      const id = String(Math.random())
+      const good = m.title.endsWith('recovered')
+      setToasts((t) => [{ id, kind: 'msg' as const, ok: good, msg: (m.subtitle ? m.subtitle + ': ' : '') + m.title, detail: m.body,
+        open: m.key ? () => { if (m.product && m.product !== 'cd') setProduct(m.product as Product); openKey(m.key!) } : undefined }, ...t].slice(0, 6))
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 12000)
+    })
+    const offOpen = EventsOn('notify:open', (p: { key: string; product?: string }) => {
+      if (p.product && p.product !== 'cd') setProduct(p.product as Product)
+      openKey(p.key)
+    })
+    const offUpd = EventsOn('update:available', (r: { tag: string; url: string; assetUrl?: string }) => {
+      setToasts((t) => [{ id: 'update', kind: 'msg' as const, ok: true, msg: `Syncscope ${r.tag} is available`, detail: 'Click to download',
+        open: () => API.OpenURL(r.assetUrl || r.url) }, ...t.filter((x) => x.id !== 'update')])
+    })
+    return () => { offMsg(); offOpen(); offUpd() }
+  }, [openKey])
+
   const runAction = useCallback(async (kind: ActionKind, keys: string[], o?: argocd.SyncOptions, d?: store.DeleteOptions) => {
     setConfirm(null)
     let rep
@@ -177,6 +210,11 @@ export default function App() {
         searchRef.current?.select()
         return
       }
+      if ((e.key === 'p' || e.key === 'P') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setPalette(true)
+        return
+      }
       if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSidebarCollapsed((c) => !c)
@@ -190,7 +228,7 @@ export default function App() {
         }
         return
       }
-      if (product !== 'cd' || creating || kPage || detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
+      if (palette || product !== 'cd' || creating || kPage || detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
       if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSelected(new Set(filtered.map((a) => a.key)))
@@ -213,7 +251,7 @@ export default function App() {
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [filtered, focused, selected, detail, appSetPage, settingsOpen, confirm, editCtx, loginCtx, tab, product, kPage])
+  }, [filtered, focused, selected, detail, appSetPage, settingsOpen, confirm, editCtx, loginCtx, tab, product, kPage, palette, creating])
 
   const toggleSet = (s: Set<string>, v: string, setter: (s: Set<string>) => void) => {
     const n = new Set(s)
@@ -228,6 +266,19 @@ export default function App() {
   const sel = [...selected]
   const selApps = sel.map((k) => data.apps.get(k)).filter(Boolean) as AppRow[]
   const ctxById = (id: string) => contexts.find((c) => c.id === id)
+
+  const paletteCommands: PaletteItem[] = [
+    { id: 'go-cd', label: 'Go to Argo CD', group: 'Commands', run: () => { setProduct('cd'); setKPage(null) } },
+    { id: 'go-wf', label: 'Go to Argo Workflows', group: 'Commands', run: () => { setProduct('workflows'); setDetail(null) } },
+    { id: 'go-ro', label: 'Go to Argo Rollouts', group: 'Commands', run: () => { setProduct('rollouts'); setDetail(null) } },
+    { id: 'go-ev', label: 'Go to Argo Events', group: 'Commands', run: () => { setProduct('events'); setDetail(null) } },
+    { id: 'problems', label: 'Show problems', group: 'Commands', run: () => { setProduct('cd'); setDetail(null); setTab('problems') } },
+    { id: 'new-app', label: 'New application…', group: 'Commands', run: () => setCreating(true) },
+    { id: 'settings', label: 'Open settings', group: 'Commands', run: () => setSettingsOpen(true) },
+    { id: 'theme', label: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', group: 'Commands', run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+    { id: 'sidebar', label: sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar', group: 'Commands', run: () => setSidebarCollapsed(!sidebarCollapsed) },
+    { id: 'favs', label: 'Show favorite applications', group: 'Commands', run: () => { setProduct('cd'); setTab('apps'); setQueryFor('apps', 'is:favorite') } },
+  ]
 
   const connected = data.statuses.some((s) => s.state === 'ok')
   const anyCtx = data.statuses.length > 0
@@ -282,6 +333,8 @@ export default function App() {
               {tab === 'apps' && <span className="count">{filtered.length.toLocaleString('en-US')} / {base.length.toLocaleString('en-US')}</span>}
               <span className="kbd">⌘K</span>
             </div>
+            <SavedSearches scope={'cd:' + tab} query={query} setQuery={setQuery} />
+            <button className="btn sm ghost" title="Command palette (⌘P)" onClick={() => setPalette(true)}>⌘P</button>
           </div>
           <div className="tabs">
             <div className={'tab' + (tab === 'apps' ? ' active' : '')} onClick={() => setTab('apps')}>
@@ -345,6 +398,9 @@ export default function App() {
                 </span>
               ))}
               <span className="sep" />
+              <span className={'chip' + (query.includes('is:favorite') ? ' on' : '')} onClick={() => setQuery((q) => (q.includes('is:favorite') ? q.replace(/\s*is:favorite/, '').trim() : (q + ' is:favorite').trim()))}>
+                ★ Favorites
+              </span>
               <span className={'chip' + (query.includes('is:error') ? ' on' : '')} onClick={() => setQuery((q) => (q.includes('is:error') ? q.replace(/\s*is:error/, '').trim() : (q + ' is:error').trim()))}>
                 ⚠ Failing only<span className="n">{facet.err}</span>
               </span>
@@ -493,6 +549,15 @@ export default function App() {
           }}
         />
       )}
+      {palette && (
+        <Palette
+          onClose={() => setPalette(false)}
+          openApp={openKey}
+          openAppSet={(k) => { setProduct('cd'); setKPage(null); setDetail(null); setAppSetPage(k) }}
+          openK={(k) => { const kind = k.split('|')[1]; setProduct(['Rollout'].includes(kind) ? 'rollouts' : ['EventSource', 'Sensor', 'EventBus'].includes(kind) ? 'events' : 'workflows'); setDetail(null); setKPage(k) }}
+          commands={paletteCommands}
+        />
+      )}
       {creating && (
         <CreateAppDialog
           statuses={data.statuses}
@@ -537,7 +602,7 @@ export default function App() {
           onSaved={async (c) => {
             setEditCtx(null)
             await refreshContexts()
-            if (editCtx === 'new' && c.authType !== 'cli') setLoginCtx(c)
+            if (editCtx === 'new' && c.authType !== 'cli' && c.authType !== 'core') setLoginCtx(c)
           }}
         />
       )}

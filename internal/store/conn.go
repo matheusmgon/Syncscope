@@ -9,6 +9,7 @@ import (
 
 	"syncscope/internal/argocd"
 	"syncscope/internal/config"
+	"syncscope/internal/core"
 )
 
 type enrichEntry struct {
@@ -20,7 +21,7 @@ type enrichEntry struct {
 type conn struct {
 	m      *Manager
 	cfg    config.Context
-	client *argocd.Client
+	client argocd.API
 	cerr   error
 
 	cancel context.CancelFunc
@@ -49,9 +50,13 @@ func newConn(m *Manager, c config.Context) *conn {
 		status: ContextStatus{ID: c.ID, Name: c.Name, Server: c.Server, AuthType: c.AuthType,
 			Color: c.Color, Disabled: c.Disabled, State: "idle"},
 	}
-	cn.client, cn.cerr = argocd.NewClient(c.ClientOptions(), m.cfg.Credentials(c.ID), func(cr argocd.Credentials) {
-		m.cfg.SetCredentials(c.ID, cr)
-	})
+	if c.AuthType == config.AuthCore {
+		cn.client, cn.cerr = core.New(c.KubeContext, c.Namespace)
+	} else {
+		cn.client, cn.cerr = argocd.NewClient(c.ClientOptions(), m.cfg.Credentials(c.ID), func(cr argocd.Credentials) {
+			m.cfg.SetCredentials(c.ID, cr)
+		})
+	}
 	return cn
 }
 
@@ -377,11 +382,15 @@ func (c *conn) onEvent(ev argocd.ApplicationWatchEvent) {
 	}
 	c.dirty.Store(true)
 	c.mu.Lock()
+	prev, had := c.sums[key]
 	c.apps[key] = &a
 	s := summarize(c.cfg.ID, &a, c.clusters, c.enrichFor(key, &a))
 	c.sums[key] = s
 	c.mu.Unlock()
 	c.m.queueUp(s)
+	if had && c.m.OnTransition != nil {
+		c.m.OnTransition(prev, s)
+	}
 	c.maybeEnrich(key, &a)
 }
 

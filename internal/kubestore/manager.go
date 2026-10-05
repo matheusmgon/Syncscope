@@ -37,6 +37,8 @@ type ContextStatus struct {
 type Manager struct {
 	cfg  *config.Store
 	emit Emitter
+	// OnTransition is called for watch updates of objects already known.
+	OnTransition func(prev, cur Obj)
 
 	mu    sync.RWMutex
 	conns map[string]*kconn
@@ -320,6 +322,7 @@ func (c *kconn) upsert(kind string, u *unstructured.Unstructured) {
 	s := Summarize(c.name, kind, u)
 	c.mu.Lock()
 	_, existed := c.raw[s.Key]
+	prev := c.sums[s.Key]
 	c.raw[s.Key], c.sums[s.Key] = u, s
 	if !existed {
 		ks := c.status.Kinds[kind]
@@ -331,6 +334,9 @@ func (c *kconn) upsert(kind string, u *unstructured.Unstructured) {
 	delete(c.m.pendDel, s.Key)
 	c.m.pendUp[s.Key] = s
 	c.m.pendMu.Unlock()
+	if existed && c.m.OnTransition != nil {
+		c.m.OnTransition(prev, s)
+	}
 }
 
 func (c *kconn) delete(kind, ns, name string) {
