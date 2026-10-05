@@ -618,7 +618,72 @@ export namespace store {
 		    return a;
 		}
 	}
+	export class AppSetDetail {
+	    summary: AppSetSummary;
+	    spec: string;
+	    generators: string[];
+	    conditions: argocd.Condition[];
+	    apps: string[];
+	    preserve: boolean;
 	
+	    static createFrom(source: any = {}) {
+	        return new AppSetDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = this.convertValues(source["summary"], AppSetSummary);
+	        this.spec = source["spec"];
+	        this.generators = source["generators"];
+	        this.conditions = this.convertValues(source["conditions"], argocd.Condition);
+	        this.apps = source["apps"];
+	        this.preserve = source["preserve"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class ArgoConfig {
+	    version: string;
+	    repositories: any[];
+	    projects: any[];
+	    accounts: any[];
+	    clusters: any[];
+	    settings: string;
+	    errors: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArgoConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.repositories = source["repositories"];
+	        this.projects = source["projects"];
+	        this.accounts = source["accounts"];
+	        this.clusters = source["clusters"];
+	        this.settings = source["settings"];
+	        this.errors = source["errors"];
+	    }
+	}
 	export class ClusterSummary {
 	    ctx: string;
 	    name: string;
@@ -675,6 +740,54 @@ export namespace store {
 	        this.synced = source["synced"];
 	        this.appSetsError = source["appSetsError"];
 	        this.clustersError = source["clustersError"];
+	    }
+	}
+	export class DeleteOptions {
+	    cascade: boolean;
+	    policy: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cascade = source["cascade"];
+	        this.policy = source["policy"];
+	    }
+	}
+	export class HistoryEntry {
+	    id: number;
+	    revision: string;
+	    deployedAt: string;
+	    startedAt?: string;
+	    source?: string;
+	    path?: string;
+	    target?: string;
+	    author?: string;
+	    date?: string;
+	    message?: string;
+	    metaError?: string;
+	    current: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HistoryEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.revision = source["revision"];
+	        this.deployedAt = source["deployedAt"];
+	        this.startedAt = source["startedAt"];
+	        this.source = source["source"];
+	        this.path = source["path"];
+	        this.target = source["target"];
+	        this.author = source["author"];
+	        this.date = source["date"];
+	        this.message = source["message"];
+	        this.metaError = source["metaError"];
+	        this.current = source["current"];
 	    }
 	}
 	export class LogRequest {

@@ -5,19 +5,21 @@ import { getApp, useData } from '../data'
 import { HealthIcon, Pill, SyncIcon, ago } from './Status'
 import { ProblemList } from './Problems'
 import { ResourceTree } from './ResourceTree'
+import { HistoryView } from './History'
 
 type Props = {
   appKey: string
   ctxName: string
   onClose: () => void
-  onAction: (action: 'sync' | 'refresh' | 'hard' | 'restart' | 'terminate', keys: string[]) => void
+  onAction: (action: 'sync' | 'refresh' | 'hard' | 'restart' | 'terminate' | 'delete', keys: string[]) => void
   notify: (msg: string, ok: boolean) => void
   left: number
+  onOpenAppSet: (name: string) => void
 }
 
-type DetailTab = 'tree' | 'summary' | 'resources'
+type DetailTab = 'tree' | 'summary' | 'resources' | 'history'
 
-export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Props) {
+export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpenAppSet }: Props) {
   const [tab, setTab] = useState<DetailTab>('tree')
   const [showProblems, setShowProblems] = useState(true)
   const { version } = useData()
@@ -71,7 +73,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Pro
           </h2>
           <div className="meta">
             {ctxName} · project <b>{s.project}</b>
-            {s.appSet && <> · ApplicationSet <b>{s.appSet}</b></>} · {s.cluster}/{s.destNamespace}
+            {s.appSet && <> · ApplicationSet <a onClick={() => onOpenAppSet(s.appSet)}><b>{s.appSet}</b></a></>} · {s.cluster}/{s.destNamespace}
           </div>
           <div className="tools">
             <Pill kind="health" status={s.health} />
@@ -87,6 +89,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Pro
             {s.opPhase === 'Running' && <button className="btn danger" onClick={() => onAction('terminate', [appKey])}>■ Terminate sync</button>}
             <span className="spacer" />
             <button className="btn ghost" onClick={() => API.OpenInArgo(appKey)}>Open in Argo CD ↗</button>
+            <button className="btn danger-outline" onClick={() => onAction('delete', [appKey])}>🗑 Delete</button>
           </div>
           <div className="tabs detail-tabs">
             <div className={'tab' + (tab === 'tree' ? ' active' : '')} onClick={() => setTab('tree')}>Tree</div>
@@ -94,6 +97,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Pro
             <div className={'tab' + (tab === 'resources' ? ' active' : '')} onClick={() => setTab('resources')}>
               Resources <span className="badge">{d?.resources?.length ?? 0}</span>
             </div>
+            <div className={'tab' + (tab === 'history' ? ' active' : '')} onClick={() => setTab('history')}>History &amp; rollback</div>
           </div>
         </header>
         {problems.length > 0 && (
@@ -125,6 +129,8 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Pro
         )}
         {tab !== 'tree' && (
         <div className="body selectable">
+
+          {tab === 'history' && <HistoryView appKey={appKey} autoSync={s.autoSync} notify={notify} />}
 
           {tab === 'summary' && op && (
             <section>

@@ -77,6 +77,17 @@ func (a *App) StartLogs(key string, req store.LogRequest) (string, error) {
 }
 func (a *App) StopLogs(id string) { a.m.StopLogs(id) }
 
+func (a *App) Delete(keys []string, o store.DeleteOptions) store.ActionReport {
+	return a.m.Delete(keys, o)
+}
+func (a *App) History(key string) ([]store.HistoryEntry, error) { return a.m.History(key) }
+func (a *App) Rollback(key string, id int64, prune, dryRun bool) error {
+	return a.m.Rollback(key, id, prune, dryRun)
+}
+func (a *App) AppSetDetail(key string) (*store.AppSetDetail, error) { return a.m.AppSetDetail(key) }
+func (a *App) DeleteAppSet(key string) error                        { return a.m.DeleteAppSet(key) }
+func (a *App) ArgoConfig(ctxID string) (*store.ArgoConfig, error)   { return a.m.ArgoConfig(ctxID) }
+
 func (a *App) OpenInArgo(key string) error {
 	u, err := a.m.WebURL(key)
 	if err != nil {

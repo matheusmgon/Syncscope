@@ -42,6 +42,17 @@ Argo CD instances.
   — pod or whole workload, container picker, follow, previous container, filter,
   error highlighting; double-click a pod to open its logs), plus
   **Summary** and **Resources** tabs.
+- **History & rollback**: every deploy with its commit message, author and date;
+  roll back to any previous deploy (prune optional).
+- **Delete** apps (cascade foreground/background or keep resources) from the app
+  page or in bulk, with typed confirmation.
+- **ApplicationSet page**: generated apps, generators, spec, conditions, bulk
+  sync/refresh/restart of all its apps, delete (warns about generated apps).
+- **Per-tab search**: Applications, Problems, ApplicationSets and Clusters each
+  keep their own query.
+- **Settings** (⚙): manage instances (add, import from argocd CLI, edit, log in),
+  appearance, and a read-only view of each instance's Argo CD configuration
+  (repositories with connection status, projects, accounts, clusters, settings).
 - **List or Tiles** for the applications page (tiles mirror the Argo CD cards).
 - Collapsible / resizable sidebar (⌘B).
 - Argo CD look & feel, light and dark themes.
@@ -110,6 +121,11 @@ cmd/mockargo               fake Argo CD server for development
 ```
 
 ## Roadmap
+
+- Edit Argo CD configuration from Settings (repositories, projects, clusters, accounts)
+- Other Argo projects: **Argo Workflows** (workflows, templates, logs), **Argo Rollouts**
+  (canary / blue-green status, promote, abort), **Argo Events** (event sources, sensors)
+- App icon with the Argo look
 
 - Pod logs and Kubernetes events in the detail panel
 - Live manifest diff, rollback to a history entry

@@ -407,6 +407,31 @@ func main() {
 					"info": []obj{{"name": "Status Reason", "value": "Running"}, {"name": "Containers", "value": "1/1"}, {"name": "Node", "value": "gke-pool-1-a1b2"}}})
 			}
 			writeJSON(w, obj{"nodes": nodes})
+		case sub == "" && r.Method == http.MethodDelete:
+			mu.Lock()
+			delete(apps, a.Name)
+			rv++
+			ev := obj{"result": obj{"type": "DELETED", "application": a.toJSON()}}
+			for ch := range subs {
+				select {
+				case ch <- ev:
+				default:
+				}
+			}
+			mu.Unlock()
+			writeJSON(w, obj{})
+		case sub == "rollback":
+			var b map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&b)
+			writeJSON(w, a.toJSON())
+		case strings.HasPrefix(sub, "revisions/") && strings.HasSuffix(sub, "/metadata"):
+			rev := strings.TrimSuffix(strings.TrimPrefix(sub, "revisions/"), "/metadata")
+			msgs := map[string]string{"1a2b3c4d5e6f": "feat(" + a.AppSet + "): bump image to v2.3.0", "9f8e7d6c5b4a": "fix: increase memory limit to 512Mi\n\nThe pod was OOMKilled under load."}
+			m := msgs[rev]
+			if m == "" {
+				m = "chore: update manifests"
+			}
+			writeJSON(w, obj{"author": "Jane Doe <jane@acme.io>", "date": a.Finished.Format(time.RFC3339), "message": m, "tags": []string{}})
 		case sub == "resource":
 			q := r.URL.Query()
 			containers := []obj{{"name": "app", "image": "ghcr.io/acme/app:v2.3.1"}, {"name": "istio-proxy", "image": "istio/proxyv2:1.22"}}
@@ -476,6 +501,48 @@ func main() {
 			items = append(items, obj{"metadata": obj{"name": s, "namespace": "argocd"}, "status": st})
 		}
 		writeJSON(w, obj{"items": items})
+	}))
+	mux.HandleFunc("/api/v1/applicationsets/", guard(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1/applicationsets/")
+		if r.Method == http.MethodDelete {
+			writeJSON(w, obj{})
+			return
+		}
+		conds := []obj{{"type": "ResourcesUpToDate", "status": "True", "reason": "ApplicationSetUpToDate", "message": "All applications have been generated successfully"}}
+		if name == "reporting" {
+			conds = []obj{{"type": "ErrorOccurred", "status": "True", "reason": "ApplicationGenerationFromParamsError", "message": "failed to execute go template {{.path.basename}}: map has no entry for key \"path\""}}
+		}
+		writeJSON(w, obj{"metadata": obj{"name": name, "namespace": "argocd"}, "spec": obj{
+			"goTemplate": true,
+			"generators": []obj{{"matrix": obj{"generators": []obj{
+				{"clusters": obj{"selector": obj{"matchLabels": obj{"env": "prod"}}}},
+				{"git": obj{"repoURL": "https://github.com/acme/deploy.git", "revision": "main", "directories": []obj{{"path": "apps/" + name + "/*"}}}},
+			}}}},
+			"template": obj{"metadata": obj{"name": name + "-{{.path.basename}}-{{.name}}"}, "spec": obj{"project": name,
+				"source":      obj{"repoURL": "https://github.com/acme/deploy.git", "path": "{{.path.path}}", "targetRevision": "main"},
+				"destination": obj{"server": "{{.server}}", "namespace": name + "-{{.path.basename}}"}}},
+			"syncPolicy": obj{"preserveResourcesOnDeletion": name == "billing"},
+		}, "status": obj{"conditions": conds}})
+	}))
+	mux.HandleFunc("/api/v1/repositories", guard(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, obj{"items": []obj{
+			{"repo": "https://github.com/acme/deploy.git", "type": "git", "project": "", "connectionState": obj{"status": "Successful"}},
+			{"repo": "https://charts.bitnami.com/bitnami", "type": "helm", "name": "bitnami", "connectionState": obj{"status": "Successful"}},
+			{"repo": "git@github.com:acme/legacy.git", "type": "git", "connectionState": obj{"status": "Failed", "message": "ssh: handshake failed: knownhosts: key is unknown"}},
+		}})
+	}))
+	mux.HandleFunc("/api/v1/projects", guard(func(w http.ResponseWriter, r *http.Request) {
+		items := []obj{}
+		for _, s := range append([]string{"default"}, appsets...) {
+			items = append(items, obj{"metadata": obj{"name": s}, "spec": obj{"description": "Team " + s,
+				"sourceRepos":  []string{"https://github.com/acme/*"},
+				"destinations": []obj{{"server": "*", "namespace": s + "-*"}},
+				"roles":        []obj{{"name": "ci", "policies": []string{"p, proj:" + s + ":ci, applications, sync, " + s + "/*, allow"}}}}})
+		}
+		writeJSON(w, obj{"items": items})
+	}))
+	mux.HandleFunc("/api/v1/account", guard(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, obj{"items": []obj{{"name": "admin", "enabled": true, "capabilities": []string{"login"}}, {"name": "ci-bot", "enabled": true, "capabilities": []string{"apiKey"}, "tokens": []obj{{"id": "t1", "issuedAt": 1730000000}}}}})
 	}))
 	mux.HandleFunc("/api/v1/clusters", guard(func(w http.ResponseWriter, r *http.Request) {
 		items := []obj{}

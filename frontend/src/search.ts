@@ -30,12 +30,12 @@ export function parseQuery(q: string): Term[] {
   return terms
 }
 
-function test(a: App, t: Term, ctxNames: Map<string, string>): boolean {
+function test(a: App, t: Term, ctxNames: Map<string, string>, extra?: (a: App) => string): boolean {
   const v = t.value
   const has = (s: string) => (t.exact ? s.toLowerCase() === v : s.toLowerCase().includes(v))
   switch (t.field) {
     case '':
-      return a.hay.includes(v)
+      return a.hay.includes(v) || (!!extra && extra(a).includes(v))
     case 'name':
       return has(a.name)
     case 'appset':
@@ -85,12 +85,12 @@ function test(a: App, t: Term, ctxNames: Map<string, string>): boolean {
   }
 }
 
-export function filterApps(apps: Iterable<App>, q: string, ctxNames: Map<string, string>, pred?: (a: App) => boolean): App[] {
+export function filterApps(apps: Iterable<App>, q: string, ctxNames: Map<string, string>, pred?: (a: App) => boolean, extra?: (a: App) => string): App[] {
   const terms = parseQuery(q)
   const out: App[] = []
   outer: for (const a of apps) {
     if (pred && !pred(a)) continue
-    for (const t of terms) if (test(a, t, ctxNames) === t.neg) continue outer
+    for (const t of terms) if (test(a, t, ctxNames, extra) === t.neg) continue outer
     out.push(a)
   }
   return out
@@ -116,3 +116,16 @@ export function sortApps(list: App[], key: SortKey, desc: boolean) {
   list.sort(desc ? (a, b) => f(b, a) : f)
   return list
 }
+
+// Plain text search for non-app lists (ApplicationSets, clusters, problems):
+// every term must appear in one of the fields; "-term" excludes.
+export function matchText(q: string, ...fields: (string | undefined)[]): boolean {
+  const hay = fields.filter(Boolean).join('\u0001').toLowerCase()
+  for (const t of parseQuery(q)) {
+    const v = (t.field ? t.field + ':' : '') + t.value
+    if (hay.includes(t.field ? t.value : v) === t.neg) return false
+  }
+  return true
+}
+
+export const problemText = (a: App) => (a.problems ?? []).map((p) => (p.resource ?? '') + ' ' + p.message).join('\u0001').toLowerCase()

@@ -4,9 +4,13 @@ import {store} from '../models';
 import {argocd} from '../models';
 import {config} from '../models';
 
+export function AppSetDetail(arg1:string):Promise<store.AppSetDetail>;
+
 export function AppSets():Promise<Array<store.AppSetSummary>>;
 
 export function Apps():Promise<Array<store.AppSummary>>;
+
+export function ArgoConfig(arg1:string):Promise<store.ArgoConfig>;
 
 export function CLIConfigPath():Promise<string>;
 
@@ -16,9 +20,15 @@ export function Containers(arg1:string,arg2:argocd.ResourceAction):Promise<Array
 
 export function Contexts():Promise<Array<config.Context>>;
 
+export function Delete(arg1:Array<string>,arg2:store.DeleteOptions):Promise<store.ActionReport>;
+
+export function DeleteAppSet(arg1:string):Promise<void>;
+
 export function DeleteContext(arg1:string):Promise<void>;
 
 export function Detail(arg1:string):Promise<store.AppDetail>;
+
+export function History(arg1:string):Promise<Array<store.HistoryEntry>>;
 
 export function ImportCLI():Promise<number>;
 
@@ -43,6 +53,8 @@ export function Refresh(arg1:Array<string>,arg2:boolean):Promise<store.ActionRep
 export function Restart(arg1:Array<string>):Promise<store.ActionReport>;
 
 export function RestartResource(arg1:string,arg2:argocd.ResourceAction):Promise<void>;
+
+export function Rollback(arg1:string,arg2:number,arg3:boolean,arg4:boolean):Promise<void>;
 
 export function SaveContext(arg1:config.Context):Promise<config.Context>;
 

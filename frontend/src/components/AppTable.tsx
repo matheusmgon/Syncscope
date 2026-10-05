@@ -75,8 +75,13 @@ export function AppTable(p: Props) {
 
   const appRows = useMemo(() => rows.flatMap((r) => (r.type === 'app' ? [r.app] : [])), [rows])
 
-  // keep focused row visible
+  // Keep the focused row visible — only when the focus itself changes (keyboard
+  // navigation). Reacting to every live data update would yank the scroll
+  // position back while the user is scrolling.
+  const lastFocused = useRef<string | null>(null)
   useEffect(() => {
+    if (p.focused === lastFocused.current) return
+    lastFocused.current = p.focused
     if (!p.focused || !body.current) return
     const i = rows.findIndex((r) => r.type === 'app' && r.app.key === p.focused)
     if (i < 0) return

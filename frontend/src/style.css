@@ -93,7 +93,7 @@ a:hover { text-decoration: underline; }
   display: flex; flex-direction: column; --wails-draggable: drag;
 }
 .sidebar .brand {
-  display: flex; align-items: center; gap: 10px; padding: 34px 16px 14px;
+  display: flex; align-items: center; gap: 10px; padding: 46px 16px 14px;
   color: var(--nav-fg-strong); font-weight: 600; font-size: 16px; letter-spacing: .3px;
 }
 .sidebar .brand .logo {
@@ -123,7 +123,7 @@ a:hover { text-decoration: underline; }
   background: none; border: 0; color: #8ea4b1; cursor: pointer; padding: 2px 4px; border-radius: 3px;
 }
 .ctx .ctx-actions button:hover { color: #fff; background: rgba(255,255,255,.08); }
-.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--unknown); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--unknown); }
 .dot.ok { background: var(--healthy); }
 .dot.connecting { background: var(--progressing); animation: pulse 1s infinite alternate; }
 .dot.error { background: var(--degraded); }
@@ -152,7 +152,7 @@ body.resizing * { cursor: col-resize !important; user-select: none !important; }
   width: 28px; height: 28px; border-radius: 4px; display: grid; place-items: center; --wails-draggable: no-drag;
 }
 .rail-btn:hover { background: var(--nav-bg-2); color: #fff; }
-.sidebar.rail { width: 76px; align-items: center; padding-top: 38px; }
+.sidebar.rail { width: 76px; align-items: center; padding-top: 46px; }
 .sidebar.rail .toggle { margin-bottom: 10px; }
 .sidebar.rail .contexts { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 4px; }
 .rail-ctx {
@@ -518,3 +518,29 @@ details summary { cursor: pointer; color: var(--fg-muted); }
 .logline .lp { font-weight: 600; }
 .logs-body .muted-sm { color: #6b8796; }
 .logs-bottom { position: absolute; right: 24px; bottom: 16px; box-shadow: var(--shadow); }
+
+.footer-icons { display: flex; align-items: center; gap: 4px; }
+.footer-icons .rail-btn, .sidebar.rail .footer .rail-btn { font-size: 17px; width: 32px; height: 32px; }
+.btn.danger-outline { color: var(--error); border-color: var(--error); background: transparent; }
+.btn.danger-outline:hover { background: var(--error); color: #fff; }
+
+/* ---------- history ---------- */
+.history { display: flex; flex-direction: column; gap: 8px; }
+.hist { display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: 6px; background: var(--panel); }
+.hist.current { border-color: var(--teal); }
+.hist-id { font-weight: 700; color: var(--fg-muted); width: 36px; }
+.hist-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hist-title { font-weight: 600; }
+.hist-body { white-space: pre-wrap; color: var(--fg-muted); font-size: 12px; }
+.hist-actions { flex-shrink: 0; }
+.code-block { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 4px; padding: 10px 12px; font-family: var(--mono); font-size: 11.5px; overflow: auto; max-height: 60vh; margin: 0; }
+
+/* ---------- settings ---------- */
+.modal.settings { width: min(1000px, 94vw); height: min(720px, 88vh); }
+.modal.settings header .x { margin-left: auto; }
+.settings-body { flex: 1; display: flex; min-height: 0; }
+.settings-nav { width: 200px; border-right: 1px solid var(--border); padding: 12px 0; display: flex; flex-direction: column; }
+.settings-nav a { padding: 8px 16px; color: var(--fg-muted); text-decoration: none; border-left: 3px solid transparent; }
+.settings-nav a:hover { color: var(--fg); background: var(--hover); }
+.settings-nav a.on { color: var(--fg); border-left-color: var(--teal); background: var(--hover); }
+.settings-content { flex: 1; overflow: auto; padding: 16px 20px; }

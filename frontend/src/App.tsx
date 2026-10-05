@@ -1,9 +1,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { argocd, config } from '../wailsjs/go/models'
+import { argocd, config, store } from '../wailsjs/go/models'
 import * as API from '../wailsjs/go/main/App'
 import { startData, useData, type App as AppRow } from './data'
-import { filterApps, sortApps, type SortKey } from './search'
+import { filterApps, matchText, problemText, sortApps, type SortKey } from './search'
 import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
+import { Settings } from './components/Settings'
+import { AppSetPage } from './components/AppSetPage'
 import { AppTable, type GroupBy } from './components/AppTable'
 import { AppTiles } from './components/AppTiles'
 import { Detail } from './components/Detail'
@@ -12,6 +14,13 @@ import { ConfirmAction, ContextDialog, LoginDialog, Toasts, type ActionKind, typ
 import { HealthIcon, StatBar, SyncIcon } from './components/Status'
 
 type Tab = 'apps' | 'problems' | 'appsets' | 'clusters'
+
+const searchPlaceholder: Record<Tab, string> = {
+  apps: 'Search applications…  e.g. payments  appset:api  cluster:prod  health:degraded  is:error  label:team=core  -legacy',
+  problems: 'Search problems…  app name, message text, appset:x, cluster:x…',
+  appsets: 'Search ApplicationSets…',
+  clusters: 'Search clusters by name or server…',
+}
 
 const HEALTHS = ['Healthy', 'Progressing', 'Degraded', 'Suspended', 'Missing', 'Unknown']
 const SYNCS = ['Synced', 'OutOfSync', 'Unknown']
@@ -33,8 +42,16 @@ function save(k: string, v: unknown) {
 export default function App() {
   const data = useData()
   const [tab, setTab] = useState<Tab>('apps')
-  const [query, setQuery] = useState('')
-  const dq = useDeferredValue(query)
+  // one search per tab: Applications, Problems, ApplicationSets and Clusters each keep their own query
+  const [queries, setQueries] = useState<Record<Tab, string>>({ apps: '', problems: '', appsets: '', clusters: '' })
+  const setQueryFor = (t: Tab, v: string | ((q: string) => string)) =>
+    setQueries((qs) => ({ ...qs, [t]: typeof v === 'function' ? v(qs[t]) : v }))
+  const query = queries[tab]
+  const setQuery = (v: string | ((q: string) => string)) => setQueryFor(tab, v)
+  const dq = useDeferredValue(queries.apps)
+  const dProblems = useDeferredValue(queries.problems)
+  const dSets = useDeferredValue(queries.appsets)
+  const dClusters = useDeferredValue(queries.clusters)
   const [healthF, setHealthF] = useState<Set<string>>(new Set())
   const [syncF, setSyncF] = useState<Set<string>>(new Set())
   const [ctxF, setCtxF] = useState<Set<string>>(new Set())
@@ -43,6 +60,8 @@ export default function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [focused, setFocused] = useState<string | null>(null)
   const [detail, setDetail] = useState<string | null>(null)
+  const [appSetPage, setAppSetPage] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [contexts, setContexts] = useState<config.Context[]>([])
   const [editCtx, setEditCtx] = useState<config.Context | 'new' | null>(null)
   const [loginCtx, setLoginCtx] = useState<config.Context | null>(null)
@@ -76,6 +95,8 @@ export default function App() {
     return sortApps(out, sort.key, sort.desc)
   }, [searched, healthF, syncF, sort])
 
+  const problemApps = useMemo(() => (dProblems ? filterApps(base, dProblems, ctxNames, undefined, problemText) : base), [base, dProblems, ctxNames])
+
   const facet = useMemo(() => {
     const h: Record<string, number> = {}, s: Record<string, number> = {}
     let err = 0
@@ -102,7 +123,7 @@ export default function App() {
     if (ok) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000)
   }, [])
 
-  const runAction = useCallback(async (kind: ActionKind, keys: string[], o?: argocd.SyncOptions) => {
+  const runAction = useCallback(async (kind: ActionKind, keys: string[], o?: argocd.SyncOptions, d?: store.DeleteOptions) => {
     setConfirm(null)
     let rep
     switch (kind) {
@@ -111,6 +132,12 @@ export default function App() {
       case 'hard': rep = await API.Refresh(keys, true); break
       case 'restart': rep = await API.Restart(keys); break
       case 'terminate': rep = await API.Terminate(keys); break
+      case 'delete': rep = await API.Delete(keys, d ?? store.DeleteOptions.createFrom({ cascade: true, policy: 'foreground' })); break
+    }
+    if (kind === 'delete') {
+      const gone = new Set(rep.results.filter((r) => r.ok).map((r) => r.key))
+      setDetail((cur) => (cur && gone.has(cur) ? null : cur))
+      setSelected((sel) => new Set([...sel].filter((k) => !gone.has(k))))
     }
     const id = rep.id
     setToasts((t) => [{ id, kind: 'report' as const, report: rep }, ...t].slice(0, 6))
@@ -126,7 +153,7 @@ export default function App() {
 
   const addFilter = (term: string) => {
     setTab('apps')
-    setQuery((q) => (q.includes(term) ? q : (q.trim() + ' ' + term).trim()))
+    setQueryFor('apps', (q) => (q.includes(term) ? q : (q.trim() + ' ' + term).trim()))
   }
 
   // keyboard
@@ -135,7 +162,6 @@ export default function App() {
       const inInput = (e.target as HTMLElement)?.closest('input, textarea, select')
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !inInput)) {
         e.preventDefault()
-        setTab('apps')
         searchRef.current?.focus()
         searchRef.current?.select()
         return
@@ -153,7 +179,7 @@ export default function App() {
         }
         return
       }
-      if (detail || confirm || editCtx || loginCtx || tab !== 'apps') return
+      if (detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
       if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSelected(new Set(filtered.map((a) => a.key)))
@@ -176,7 +202,7 @@ export default function App() {
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [filtered, focused, selected, detail, confirm, editCtx, loginCtx, tab])
+  }, [filtered, focused, selected, detail, appSetPage, settingsOpen, confirm, editCtx, loginCtx, tab])
 
   const toggleSet = (s: Set<string>, v: string, setter: (s: Set<string>) => void) => {
     const n = new Set(s)
@@ -207,19 +233,10 @@ export default function App() {
           if (multi) toggleSet(ctxF, id, setCtxF)
           else setCtxF(ctxF.size === 1 && ctxF.has(id) ? new Set() : new Set([id]))
         }}
-        onAdd={() => setEditCtx('new')}
+        onSettings={() => setSettingsOpen(true)}
         onEdit={(id) => setEditCtx(ctxById(id) ?? null)}
         onLogin={(id) => setLoginCtx(ctxById(id) ?? null)}
         onReconnect={(id) => API.Reconnect(id)}
-        onImport={async () => {
-          try {
-            const n = await API.ImportCLI()
-            notify(n ? `Imported ${n} context(s) from the argocd CLI` : 'No contexts found in the argocd CLI config', n > 0)
-            refreshContexts()
-          } catch (e) {
-            notify(`Could not read ${await API.CLIConfigPath()}: ${e}`, false)
-          }
-        }}
         theme={theme}
         onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         collapsed={sidebarCollapsed}
@@ -235,12 +252,12 @@ export default function App() {
               <input
                 ref={searchRef}
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); if (tab !== 'apps') setTab('apps') }}
-                placeholder='Search apps…  e.g. payments  appset:api  cluster:prod  health:degraded  is:error  label:team=core  -legacy'
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={searchPlaceholder[tab]}
                 spellCheck={false}
               />
               {query && <button className="x" style={{ fontSize: 14 }} onClick={() => setQuery('')}>✕</button>}
-              <span className="count">{filtered.length.toLocaleString('en-US')} / {base.length.toLocaleString('en-US')}</span>
+              {tab === 'apps' && <span className="count">{filtered.length.toLocaleString('en-US')} / {base.length.toLocaleString('en-US')}</span>}
               <span className="kbd">⌘K</span>
             </div>
           </div>
@@ -266,7 +283,7 @@ export default function App() {
             <p>Add an Argo CD instance or import the contexts you already use with the <code>argocd</code> CLI.</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => setEditCtx('new')}>＋ Add instance</button>
-              <button className="btn" onClick={() => document.querySelectorAll<HTMLButtonElement>('.sidebar .nav-btn')[1]?.click()}>Import from CLI</button>
+              <button className="btn" onClick={() => setSettingsOpen(true)}>Import from argocd CLI…</button>
             </div>
           </div>
         )}
@@ -326,6 +343,8 @@ export default function App() {
                 <button className="btn" onClick={() => requestAction('hard', sel)}>Hard refresh</button>
                 <button className="btn" onClick={() => requestAction('restart', sel)}>↻ Restart</button>
                 {selApps.some((a) => a.opPhase === 'Running') && <button className="btn danger" onClick={() => requestAction('terminate', selApps.filter((a) => a.opPhase === 'Running').map((a) => a.key))}>■ Terminate</button>}
+                <span className="sep" />
+                <button className="btn danger-outline" onClick={() => requestAction('delete', sel)}>🗑 Delete</button>
               </div>
             )}
             {filtered.length === 0 ? (
@@ -368,36 +387,49 @@ export default function App() {
 
         {anyCtx && tab === 'problems' && (
           <ProblemsView
-            apps={base}
-            appsets={data.appsets.filter((s) => !ctxF.size || ctxF.has(s.ctx))}
-            clusters={data.clusters.filter((c) => !ctxF.size || ctxF.has(c.ctx))}
+            apps={problemApps}
+            appsets={data.appsets.filter((s) => (!ctxF.size || ctxF.has(s.ctx)) && matchText(dProblems, s.name, ...(s.problems ?? []).map((p) => p.message)))}
+            clusters={data.clusters.filter((c) => (!ctxF.size || ctxF.has(c.ctx)) && matchText(dProblems, c.name, c.server, c.message))}
             ctxNames={ctxNames}
             onOpen={(k) => setDetail(k)}
             onAction={requestAction}
-            onFilterAppSet={(n) => addFilter(`appset:"${n}"`)}
+            onFilterAppSet={(k) => setAppSetPage(k)}
           />
         )}
 
         {anyCtx && tab === 'appsets' && (
           <AppSetsView
             apps={base}
+            query={dSets}
             statuses={data.statuses}
             appsets={data.appsets.filter((s) => !ctxF.size || ctxF.has(s.ctx))}
             ctxNames={ctxNames}
-            onPick={(n) => { setQuery(''); setTab('apps'); setQuery(`appset:"${n}"`) }}
+            onPick={(key) => setAppSetPage(key)}
           />
         )}
 
         {anyCtx && tab === 'clusters' && (
           <ClustersView
             apps={base}
-            clusters={data.clusters.filter((c) => !ctxF.size || ctxF.has(c.ctx))}
+            clusters={data.clusters.filter((c) => (!ctxF.size || ctxF.has(c.ctx)) && matchText(dClusters, c.name, c.server, c.version, c.state, ctxNames.get(c.ctx)))}
             ctxNames={ctxNames}
             onPick={(n) => addFilter(`cluster:"${n}"`)}
           />
         )}
       </div>
 
+      {appSetPage && (
+        <AppSetPage
+          setKey={appSetPage}
+          ctxName={ctxNames.get(appSetPage.split('|')[0]) ?? ''}
+          left={sidebarCollapsed ? 76 : sidebarWidth}
+          onClose={() => setAppSetPage(null)}
+          onOpenApp={(k) => setDetail(k)}
+          onShowInList={(n) => { setAppSetPage(null); setTab('apps'); setQueryFor('apps', `appset:"${n}"`) }}
+          onAction={requestAction}
+          notify={notify}
+        />
+      )}
       {detail && (
         <Detail
           appKey={detail}
@@ -406,6 +438,28 @@ export default function App() {
           onAction={requestAction}
           notify={notify}
           left={sidebarCollapsed ? 76 : sidebarWidth}
+          onOpenAppSet={(name) => {
+            const ctx = detail.split('|')[0]
+            const s = data.appsets.find((x) => x.ctx === ctx && x.name === name)
+            setAppSetPage(s ? s.key : `${ctx}|/${name}`)
+            setDetail(null)
+          }}
+        />
+      )}
+      {settingsOpen && (
+        <Settings
+          statuses={data.statuses}
+          contexts={contexts}
+          theme={theme}
+          setTheme={setTheme}
+          view={view}
+          setView={setView}
+          onClose={() => setSettingsOpen(false)}
+          onAdd={() => setEditCtx('new')}
+          onEdit={(c) => setEditCtx(c)}
+          onLogin={(c) => setLoginCtx(c)}
+          notify={notify}
+          refreshContexts={refreshContexts}
         />
       )}
       {editCtx && (
@@ -434,7 +488,7 @@ export default function App() {
             return a ? (ctxNames.size > 1 ? `${ctxNames.get(a.ctx)} / ${a.name}` : a.name) : k
           })}
           onClose={() => setConfirm(null)}
-          onRun={(o) => runAction(confirm.kind, confirm.keys, o)}
+          onRun={(o, d) => runAction(confirm.kind, confirm.keys, o, d)}
         />
       )}
       <Toasts toasts={toasts} progress={data.progress} onClose={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
@@ -442,12 +496,11 @@ export default function App() {
   )
 }
 
-function AppSetsView({ apps, appsets, statuses, ctxNames, onPick }: {
+function AppSetsView({ apps, appsets, statuses, ctxNames, onPick, query }: {
   apps: AppRow[]; appsets: { key: string; ctx: string; name: string; namespace: string; problems?: { message: string }[] }[]
   statuses: { id: string; name: string; state: string; appSetsError?: string }[]
-  ctxNames: Map<string, string>; onPick: (name: string) => void
+  ctxNames: Map<string, string>; onPick: (key: string) => void; query: string
 }) {
-  const [q, setQ] = useState('')
   const stats = useMemo(() => {
     const m = new Map<string, { n: number; err: number; oos: number; h: Record<string, number> }>()
     for (const a of apps) {
@@ -470,13 +523,12 @@ function AppSetsView({ apps, appsets, statuses, ctxNames, onPick }: {
     for (const k of stats.keys()) {
       if (byKey.has(k)) continue
       const [ctx, name] = [k.slice(0, k.indexOf('|')), k.slice(k.indexOf('|') + 1)]
-      byKey.set(k, { key: k, ctx, name, namespace: '', listed: false })
+      byKey.set(k, { key: ctx + '|/' + name, ctx, name, namespace: '', listed: false })
     }
-    const f = q.trim().toLowerCase()
     return [...byKey.values()]
-      .filter((s) => !f || s.name.toLowerCase().includes(f))
+      .filter((s) => matchText(query, s.name, s.namespace, ctxNames.get(s.ctx), ...(s.problems ?? []).map((p) => p.message)))
       .sort((a, b) => (b.problems?.length ?? 0) - (a.problems?.length ?? 0) || (stats.get(b.ctx + '|' + b.name)?.err ?? 0) - (stats.get(a.ctx + '|' + a.name)?.err ?? 0) || a.name.localeCompare(b.name))
-  }, [appsets, stats, q])
+  }, [appsets, stats, query, ctxNames])
   const noLinks = apps.length > 0 && stats.size === 0
   const errors = statuses.filter((s) => s.appSetsError)
   const unowned = apps.filter((a) => !a.appSet).length
@@ -493,7 +545,6 @@ function AppSetsView({ apps, appsets, statuses, ctxNames, onPick }: {
         </div>
       )}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-        <input className="rtree-filter" placeholder="Filter ApplicationSets…" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="muted-sm">{rows.length} ApplicationSets · {unowned} apps not generated by an ApplicationSet</span>
       </div>
       <div className="card">
@@ -503,7 +554,7 @@ function AppSetsView({ apps, appsets, statuses, ctxNames, onPick }: {
             {rows.map((s) => {
               const st = stats.get(s.ctx + '|' + s.name)
               return (
-                <tr key={s.key} className="click" onClick={() => onPick(s.name)}>
+                <tr key={s.key} className="click" onClick={() => onPick(s.key)}>
                   <td><b>{s.name}</b>{!s.listed && <span className="muted-sm" title="Known only from the apps' owner references"> (from apps)</span>}</td>
                   <td>{ctxNames.get(s.ctx)}</td>
                   <td>{st?.n ?? 0}</td>

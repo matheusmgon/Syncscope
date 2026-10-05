@@ -37,6 +37,8 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
   const lines = useRef<Line[]>([])
   const box = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
+  const [atBottom, setAtBottom] = useState(true)
+  const frozen = useRef<{ total: number; list: Line[] } | null>(null)
   const aggregated = node.kind !== 'Pod'
 
   const ref = useMemo(
@@ -68,6 +70,8 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
     let dead = false
     lines.current = []
     stick.current = true
+    frozen.current = null
+    setAtBottom(true)
     setVersion((v) => v + 1)
     setState({ status: 'loading' })
     const off = EventsOn('logs', (p: { id: string; lines?: Line[]; done?: boolean; error?: string }) => {
@@ -97,11 +101,16 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
     }
   }, [appKey, node, container, tail, follow, previous, ready])
 
-  const shown = useMemo(() => {
+  // While the user is scrolled up, the view is frozen so new lines never move
+  // what they are reading; "↓ Latest" resumes.
+  const live = useMemo(() => {
     const q = filter.trim().toLowerCase()
     const src = q ? lines.current.filter((l) => l.content.toLowerCase().includes(q) || l.pod.toLowerCase().includes(q)) : lines.current
     return { total: src.length, list: src.slice(-RENDER_LINES) }
   }, [version, filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (atBottom || !frozen.current) frozen.current = live
+  const shown = atBottom ? live : frozen.current
+  const pending = live.total - shown.total
 
   useLayoutEffect(() => {
     if (stick.current && box.current) box.current.scrollTop = box.current.scrollHeight
@@ -140,7 +149,9 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
         ref={box}
         onScroll={(e) => {
           const el = e.currentTarget
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 30
+          const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30
+          stick.current = bottom
+          if (bottom !== atBottom) setAtBottom(bottom)
         }}
       >
         {shown.total > shown.list.length && <div className="muted-sm">… {shown.total - shown.list.length} earlier lines hidden (use the filter)</div>}
@@ -153,8 +164,10 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
         ))}
         {state.status !== 'loading' && shown.total === 0 && <div className="muted-sm">No log lines{filter ? ' match the filter' : ''}.</div>}
       </div>
-      {!stick.current && (
-        <button className="btn sm logs-bottom" onClick={() => { stick.current = true; box.current && (box.current.scrollTop = box.current.scrollHeight) }}>↓ Latest</button>
+      {!atBottom && (
+        <button className="btn sm logs-bottom" onClick={() => { stick.current = true; setAtBottom(true); requestAnimationFrame(() => box.current && (box.current.scrollTop = box.current.scrollHeight)) }}>
+          ↓ Latest{pending > 0 ? ` (${pending} new)` : ''}
+        </button>
       )}
     </div>
   )

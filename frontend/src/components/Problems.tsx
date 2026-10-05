@@ -111,7 +111,7 @@ export function ProblemsView(p: Props) {
           <div className="group-title">Failing ApplicationSets</div>
           {badSets.map((s) => (
             <div key={s.key} className="pcard">
-              <div className="phead" onClick={() => p.onFilterAppSet(s.name)}>
+              <div className="phead" onClick={() => p.onFilterAppSet(s.key)}>
                 <span className="name">{s.name}</span>
                 <span className="where">{p.ctxNames.get(s.ctx)} · {s.namespace}</span>
               </div>

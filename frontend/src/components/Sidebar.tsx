@@ -12,11 +12,10 @@ type Props = {
   version: number
   selected: Set<string>
   onToggle: (id: string, multi: boolean) => void
-  onAdd: () => void
+  onSettings: () => void
   onEdit: (id: string) => void
   onLogin: (id: string) => void
   onReconnect: (id: string) => void
-  onImport: () => void
   theme: string
   onTheme: () => void
   collapsed: boolean
@@ -92,9 +91,8 @@ export function Sidebar(p: Props) {
           })}
         </div>
         <div className="footer">
-          <button className="rail-btn" title="Add instance" onClick={p.onAdd}>＋</button>
-          <button className="rail-btn" title="Import from argocd CLI" onClick={p.onImport}>⇣</button>
-          <button className="rail-btn" title={p.theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={p.onTheme}>{p.theme === 'dark' ? '☀' : '☾'}</button>
+          <button className="rail-btn" title="Settings" onClick={p.onSettings}>⚙</button>
+          <button className="rail-btn" title={p.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={p.onTheme}>{p.theme === 'dark' ? '☀' : '☾'}</button>
         </div>
       </aside>
     )
@@ -124,7 +122,7 @@ export function Sidebar(p: Props) {
       <div className="contexts">
         {p.statuses.length === 0 && (
           <div style={{ padding: '8px 16px', color: '#7f97a5', lineHeight: 1.5 }}>
-            No instances yet. Add one or import from the <code>argocd</code> CLI.
+            No instances yet. <a style={{ color: '#7fd3dc' }} onClick={p.onSettings}>Open Settings</a> to add one or import from the <code>argocd</code> CLI.
           </div>
         )}
         {p.statuses.map((s) => {
@@ -167,9 +165,11 @@ export function Sidebar(p: Props) {
         })}
       </div>
       <div className="footer">
-        <button className="nav-btn primary" onClick={p.onAdd}>＋ Add instance</button>
-        <button className="nav-btn" onClick={p.onImport}>⇣ Import from argocd CLI</button>
-        <button className="nav-btn" onClick={p.onTheme}>{p.theme === 'dark' ? '☀ Light theme' : '☾ Dark theme'}</button>
+        <div className="footer-icons">
+          <button className="rail-btn" title="Settings — instances, appearance, Argo CD configuration" onClick={p.onSettings}>⚙</button>
+          <span className="spacer" />
+          <button className="rail-btn" title={p.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={p.onTheme}>{p.theme === 'dark' ? '☀' : '☾'}</button>
+        </div>
       </div>
     </aside>
   )
