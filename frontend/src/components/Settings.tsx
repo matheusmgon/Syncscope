@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { config, store } from '../../wailsjs/go/models'
+import { config, kubestore, store } from '../../wailsjs/go/models'
 import * as API from '../../wailsjs/go/main/App'
 
-type Tab = 'instances' | 'appearance' | 'argocd'
+type Tab = 'instances' | 'appearance' | 'argocd' | 'kube'
 
 const authLabel: Record<string, string> = { sso: 'SSO', password: 'Username/password', token: 'API token', cli: 'argocd CLI' }
 const stateLabel: Record<string, string> = { ok: 'connected', connecting: 'connecting…', error: 'error', auth: 'login required', idle: 'disabled' }
@@ -52,6 +52,7 @@ export function Settings(p: Props) {
           <nav className="settings-nav">
             <a className={tab === 'instances' ? 'on' : ''} onClick={() => setTab('instances')}>Argo CD instances</a>
             <a className={tab === 'argocd' ? 'on' : ''} onClick={() => setTab('argocd')}>Argo CD configuration</a>
+            <a className={tab === 'kube' ? 'on' : ''} onClick={() => setTab('kube')}>Kubernetes clusters</a>
             <a className={tab === 'appearance' ? 'on' : ''} onClick={() => setTab('appearance')}>Appearance</a>
           </nav>
           <div className="settings-content">
@@ -113,6 +114,7 @@ export function Settings(p: Props) {
               </div>
             )}
             {tab === 'argocd' && <ArgoConfigView statuses={p.statuses} />}
+            {tab === 'kube' && <KubeContextsView notify={p.notify} />}
           </div>
         </div>
       </div>
@@ -235,6 +237,53 @@ function ArgoConfigView({ statuses }: { statuses: store.ContextStatus[] }) {
         </table>
       )}
       {cfg && tab === 'settings' && <pre className="code-block selectable">{cfg.settings}</pre>}
+    </>
+  )
+}
+
+function KubeContextsView({ notify }: { notify: (m: string, ok: boolean) => void }) {
+  const [list, setList] = useState<kubestore.ContextView[] | null>(null)
+  const [paths, setPaths] = useState<string[]>([])
+  const [err, setErr] = useState('')
+  const [q, setQ] = useState('')
+  const reload = () => {
+    API.KubeContexts().then((l) => setList(l ?? [])).catch((e) => setErr(String(e)))
+    API.KubeconfigPaths().then((p) => setPaths(p ?? []))
+  }
+  useEffect(reload, [])
+  const toggle = async (name: string, on: boolean) => {
+    const next = (list ?? []).filter((c) => (c.name === name ? on : c.enabled)).map((c) => c.name)
+    try {
+      await API.SetKubeContexts(next)
+      setList((l) => (l ?? []).map((c) => (c.name === name ? kubestore.ContextView.createFrom({ ...c, enabled: on }) : c)))
+      notify(on ? `Connecting to ${name}…` : `Disconnected from ${name}`, true)
+    } catch (e) {
+      notify(String(e), false)
+    }
+  }
+  const shown = (list ?? []).filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()))
+  return (
+    <>
+      <div className="help" style={{ marginBottom: 12 }}>
+        Argo Workflows, Argo Events and Argo Rollouts are read directly from Kubernetes using your kubeconfig, like Lens does
+        (auth plugins such as <code>gke-gcloud-auth-plugin</code> work). Only the contexts you enable are contacted, and only the Argo
+        objects are read (plus pods, logs and events of those objects). Actions you take (promote, stop, delete…) use your own RBAC.
+      </div>
+      <div className="muted-sm" style={{ marginBottom: 10 }}>kubeconfig: <span className="mono">{paths.join(', ')}</span></div>
+      {err && <div className="alert">{err}</div>}
+      <input className="rtree-filter" placeholder="Filter contexts…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 8 }} />
+      <table className="grid">
+        <tbody>
+          {shown.map((c) => (
+            <tr key={c.name}>
+              <td style={{ width: 30 }}><input type="checkbox" checked={c.enabled} onChange={(e) => toggle(c.name, e.target.checked)} /></td>
+              <td><b>{c.name}</b>{c.current && <span className="badge" style={{ marginLeft: 6 }}>current</span>}<div className="muted-sm mono">{c.server}</div></td>
+              <td className="muted-sm">{c.namespace || 'default'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {list && !list.length && <div className="help">No contexts found in the kubeconfig.</div>}
     </>
   )
 }

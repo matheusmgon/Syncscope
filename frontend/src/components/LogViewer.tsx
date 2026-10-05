@@ -22,7 +22,32 @@ function podColor(pod: string) {
   return `hsl(${h} 60% 60%)`
 }
 
+// A log source: where containers and the stream come from (Argo CD or Kubernetes).
+export type LogSource = {
+  id: string // changes when the target changes
+  aggregated: boolean // several pods interleaved
+  label?: string
+  containers: () => Promise<string[]>
+  start: (o: { container: string; tailLines: number; follow: boolean; previous: boolean }) => Promise<string>
+}
+
 export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNode }) {
+  const source = useMemo<LogSource>(() => {
+    const ref = argocd.ResourceAction.createFrom({ Group: node.group, Version: node.version, Kind: node.kind, Namespace: node.namespace, Name: node.name })
+    return {
+      id: appKey + '|' + node.id,
+      aggregated: node.kind !== 'Pod',
+      label: node.kind !== 'Pod' ? `All pods of ${node.kind} ${node.name}` : undefined,
+      containers: () => API.Containers(appKey, ref),
+      start: (o) => API.StartLogs(appKey, store.LogRequest.createFrom({
+        group: node.group, version: node.version, kind: node.kind, namespace: node.namespace, name: node.name, ...o,
+      })),
+    }
+  }, [appKey, node])
+  return <LogStream source={source} />
+}
+
+export function LogStream({ source }: { source: LogSource }) {
   const [containers, setContainers] = useState<string[]>([])
   const [container, setContainer] = useState('')
   const [ready, setReady] = useState(false)
@@ -39,19 +64,14 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
   const stick = useRef(true)
   const [atBottom, setAtBottom] = useState(true)
   const frozen = useRef<{ total: number; list: Line[] } | null>(null)
-  const aggregated = node.kind !== 'Pod'
-
-  const ref = useMemo(
-    () => argocd.ResourceAction.createFrom({ Group: node.group, Version: node.version, Kind: node.kind, Namespace: node.namespace, Name: node.name }),
-    [node],
-  )
+  const aggregated = source.aggregated
 
   useEffect(() => {
     let cancel = false
     setContainers([])
     setContainer('')
     setReady(false)
-    API.Containers(appKey, ref)
+    source.containers()
       .then((cs) => {
         if (cancel) return
         setContainers(cs ?? [])
@@ -62,7 +82,7 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
       })
       .catch(() => !cancel && (setContainer(''), setReady(true)))
     return () => { cancel = true }
-  }, [appKey, ref])
+  }, [source])
 
   useEffect(() => {
     if (!ready) return
@@ -85,10 +105,7 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
       }
       if (p.done) setState(p.error ? { status: 'error', error: p.error } : { status: 'ended' })
     })
-    API.StartLogs(appKey, store.LogRequest.createFrom({
-      group: node.group, version: node.version, kind: node.kind, namespace: node.namespace, name: node.name,
-      container, tailLines: tail, follow, previous,
-    }))
+    source.start({ container, tailLines: tail, follow, previous })
       .then((x) => {
         id = x
         if (dead) API.StopLogs(x)
@@ -99,7 +116,7 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
       off()
       if (id) API.StopLogs(id)
     }
-  }, [appKey, node, container, tail, follow, previous, ready])
+  }, [source, container, tail, follow, previous, ready])
 
   // While the user is scrolled up, the view is frozen so new lines never move
   // what they are reading; "↓ Latest" resumes.
@@ -142,7 +159,7 @@ export function LogViewer({ appKey, node }: { appKey: string; node: store.TreeNo
         </span>
         <button className="btn sm" onClick={copy} title="Copy visible lines">Copy</button>
       </div>
-      {aggregated && <div className="muted-sm" style={{ padding: '0 12px 6px' }}>All pods of {node.kind} {node.name}</div>}
+      {source.label && <div className="muted-sm" style={{ padding: '0 12px 6px' }}>{source.label}</div>}
       {state.status === 'error' && <div className="alert" style={{ margin: '0 12px 8px' }}>{state.error}</div>}
       <div
         className={'logs-body mono' + (wrap ? ' wrap' : '')}

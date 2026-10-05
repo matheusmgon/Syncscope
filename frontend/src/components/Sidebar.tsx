@@ -1,6 +1,8 @@
 import { useMemo, useRef } from 'react'
 import logo from '../assets/logo.svg'
 import { ago } from './Status'
+import { useKData } from '../kdata'
+import { productKinds, type Product } from './kube/KMain'
 import { store } from '../../wailsjs/go/models'
 import type { App } from '../data'
 
@@ -24,6 +26,85 @@ type Props = {
   onCollapse: (collapsed: boolean) => void
   width: number
   onResize: (width: number) => void
+  product: Product
+  onProduct: (p: Product) => void
+  kselected: Set<string>
+  onKToggle: (name: string, multi: boolean) => void
+}
+
+const products: { id: Product; label: string; icon: string }[] = [
+  { id: 'cd', label: 'Argo CD', icon: 'cd' },
+  { id: 'workflows', label: 'Workflows', icon: 'wf' },
+  { id: 'rollouts', label: 'Rollouts', icon: 'ro' },
+  { id: 'events', label: 'Events', icon: 'ev' },
+]
+
+function useProductBadges(apps: Map<string, App>, version: number) {
+  const k = useKData()
+  return useMemo(() => {
+    const out: Record<Product, { n: number; err: number }> = { cd: { n: apps.size, err: 0 }, workflows: { n: 0, err: 0 }, rollouts: { n: 0, err: 0 }, events: { n: 0, err: 0 } }
+    for (const a of apps.values()) if (a.severity === 2) out.cd.err++
+    for (const o of k.objs.values()) {
+      for (const [prod, kinds] of Object.entries(productKinds)) {
+        if (kinds.includes(o.kind)) {
+          out[prod as Product].n++
+          if (o.severity === 2) out[prod as Product].err++
+        }
+      }
+    }
+    return out
+  }, [version, k.version]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+const kStateLabel: Record<string, string> = { ok: 'connected', connecting: 'connecting…', error: 'error' }
+
+function KubeClusters({ p, rail }: { p: Props; rail?: boolean }) {
+  const k = useKData()
+  const kinds = p.product === 'cd' ? [] : productKinds[p.product]
+  if (!k.statuses.length) {
+    return rail ? null : (
+      <div style={{ padding: '8px 16px', color: '#7f97a5', lineHeight: 1.5 }}>
+        No clusters enabled. <a style={{ color: '#7fd3dc' }} onClick={p.onSettings}>Open Settings → Kubernetes clusters</a> to pick kubeconfig contexts.
+      </div>
+    )
+  }
+  return (
+    <>
+      {k.statuses.map((s) => {
+        let n = 0, err = 0
+        for (const o of k.objs.values()) {
+          if (o.ctx === s.name && kinds.includes(o.kind)) {
+            n++
+            if (o.severity === 2) err++
+          }
+        }
+        const missing = kinds.length > 0 && kinds.every((kk) => s.kinds?.[kk]?.state === 'missing')
+        if (rail) {
+          return (
+            <div key={s.name} className={'rail-ctx' + (p.kselected.has(s.name) ? ' active' : '')} title={`${s.name} — ${kStateLabel[s.state] ?? s.state}`}
+              onClick={(e) => p.onKToggle(s.name, e.metaKey || e.ctrlKey || e.shiftKey)}>
+              <span className="rail-initial">{s.name.replace(/^gke_[^_]+_[^_]+_/, '').slice(0, 2)}</span>
+              <span className={'dot ' + s.state} />
+              {!!err && <span className="rail-err">{err}</span>}
+            </div>
+          )
+        }
+        return (
+          <div key={s.name} className={'ctx' + (p.kselected.has(s.name) ? ' active' : '')} onClick={(e) => p.onKToggle(s.name, e.metaKey || e.ctrlKey || e.shiftKey)}
+            title={`${s.name}\n${s.server}${s.version ? `\nKubernetes ${s.version}` : ''}`}>
+            <div className="row1">
+              <span className={'dot ' + s.state} />
+              <span className="name">{s.name}</span>
+            </div>
+            <div className="row2">
+              {s.state === 'ok' ? (missing ? <span>not installed</span> : <><span>{n} objects</span>{!!err && <span className="err">● {err} failing</span>}</>) : <span>{kStateLabel[s.state] ?? s.state}</span>}
+            </div>
+            {s.state === 'error' && s.message && <div className="state-msg">{s.message}</div>}
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 export const SIDEBAR_MIN = 180
@@ -71,11 +152,22 @@ export function Sidebar(p: Props) {
     window.addEventListener('mouseup', stop)
   }
 
+  const badges = useProductBadges(p.apps, p.version)
+
   if (p.collapsed) {
     return (
       <aside className="sidebar rail">
         <button className="rail-btn toggle" title="Show sidebar (⌘B)" onClick={() => p.onCollapse(false)}>»</button>
+        <div className="product-rail">
+          {products.map((x) => (
+            <button key={x.id} className={'prod-icon' + (p.product === x.id ? ' on' : '')} title={`${x.label}${badges[x.id].err ? ` — ${badges[x.id].err} failing` : ''}`} onClick={() => p.onProduct(x.id)}>
+              {x.icon}{!!badges[x.id].err && <span className="rail-err">{badges[x.id].err > 99 ? '99+' : badges[x.id].err}</span>}
+            </button>
+          ))}
+        </div>
         <div className="contexts">
+          {p.product !== 'cd' && <KubeClusters p={p} rail />}
+          {p.product === 'cd' && <>
           {p.statuses.map((s) => {
             const c = counts.get(s.id)
             return (
@@ -91,6 +183,7 @@ export function Sidebar(p: Props) {
               </div>
             )
           })}
+          </>}
         </div>
         <div className="footer">
           <button className="rail-btn" title="Settings" onClick={p.onSettings}>⚙</button>
@@ -113,6 +206,25 @@ export function Sidebar(p: Props) {
         <span style={{ flex: 1 }}>Syncscope</span>
         <button className="rail-btn toggle" title="Hide sidebar (⌘B)" onClick={() => p.onCollapse(true)}>«</button>
       </div>
+      <nav className="products">
+        {products.map((x) => (
+          <div key={x.id} className={'product' + (p.product === x.id ? ' on' : '')} onClick={() => p.onProduct(x.id)}>
+            <span className="prod-icon small">{x.icon}</span>
+            <span className="name">{x.label}</span>
+            {badges[x.id].err > 0 ? <span className="badge error">{badges[x.id].err}</span> : badges[x.id].n > 0 ? <span className="pcount">{badges[x.id].n.toLocaleString('en-US')}</span> : null}
+          </div>
+        ))}
+      </nav>
+      {p.product !== 'cd' && (
+        <>
+          <div className="section-title">
+            <span>Kubernetes clusters</span>
+            {p.kselected.size > 0 && <a style={{ color: '#7fd3dc', textTransform: 'none', letterSpacing: 0 }} onClick={() => p.onKToggle('', false)}>all</a>}
+          </div>
+          <div className="contexts"><KubeClusters p={p} /></div>
+        </>
+      )}
+      {p.product === 'cd' && <>
       <div className="section-title">
         <span>Argo CD instances</span>
         {p.selected.size > 0 && (
@@ -166,6 +278,7 @@ export function Sidebar(p: Props) {
           )
         })}
       </div>
+      </>}
       <div className="footer">
         <div className="footer-icons">
           <button className="rail-btn" title="Settings — instances, appearance, Argo CD configuration" onClick={p.onSettings}>⚙</button>

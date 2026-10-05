@@ -7,6 +7,8 @@ import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { AppSetPage } from './components/AppSetPage'
 import { SyncPolicyDialog } from './components/Parameters'
+import { startKData } from './kdata'
+import { KMain, KPageRouter, type Product } from './components/kube/KMain'
 import { AppTable, type GroupBy } from './components/AppTable'
 import { AppTiles } from './components/AppTiles'
 import { Detail } from './components/Detail'
@@ -64,6 +66,11 @@ export default function App() {
   const [appSetPage, setAppSetPage] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bulkPolicy, setBulkPolicy] = useState(false)
+  const [product, setProduct] = useState<Product>(() => load('product', 'cd'))
+  const [kctxF, setKctxF] = useState<Set<string>>(new Set())
+  const [kq, setKq] = useState<Record<string, string>>({})
+  const [kPage, setKPage] = useState<string | null>(null)
+  useEffect(() => save('product', product), [product])
   const [contexts, setContexts] = useState<config.Context[]>([])
   const [editCtx, setEditCtx] = useState<config.Context | 'new' | null>(null)
   const [loginCtx, setLoginCtx] = useState<config.Context | null>(null)
@@ -75,7 +82,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => load('sidebarWidth', SIDEBAR_DEFAULT))
   const searchRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { startData() }, [])
+  useEffect(() => { startData(); startKData() }, [])
   useEffect(() => { document.documentElement.dataset.theme = theme; save('theme', theme) }, [theme])
   useEffect(() => save('groupBy', groupBy), [groupBy])
   useEffect(() => save('sort', sort), [sort])
@@ -181,7 +188,7 @@ export default function App() {
         }
         return
       }
-      if (detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
+      if (product !== 'cd' || kPage || detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
       if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSelected(new Set(filtered.map((a) => a.key)))
@@ -204,7 +211,7 @@ export default function App() {
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [filtered, focused, selected, detail, appSetPage, settingsOpen, confirm, editCtx, loginCtx, tab])
+  }, [filtered, focused, selected, detail, appSetPage, settingsOpen, confirm, editCtx, loginCtx, tab, product, kPage])
 
   const toggleSet = (s: Set<string>, v: string, setter: (s: Set<string>) => void) => {
     const n = new Set(s)
@@ -236,6 +243,14 @@ export default function App() {
           else setCtxF(ctxF.size === 1 && ctxF.has(id) ? new Set() : new Set([id]))
         }}
         onSettings={() => setSettingsOpen(true)}
+        product={product}
+        onProduct={(p) => { setProduct(p); setKPage(null) }}
+        kselected={kctxF}
+        onKToggle={(name, multi) => {
+          if (!name) return setKctxF(new Set())
+          if (multi) toggleSet(kctxF, name, setKctxF)
+          else setKctxF(kctxF.size === 1 && kctxF.has(name) ? new Set() : new Set([name]))
+        }}
         onEdit={(id) => setEditCtx(ctxById(id) ?? null)}
         onLogin={(id) => setLoginCtx(ctxById(id) ?? null)}
         onReconnect={(id) => API.Reconnect(id)}
@@ -247,6 +262,9 @@ export default function App() {
         onResize={setSidebarWidth}
       />
       <div className="main">
+        {product !== 'cd' ? (
+          <KMain product={product} query={kq[product] ?? ''} setQuery={(q) => setKq((x) => ({ ...x, [product]: q }))} ctxFilter={kctxF} onOpen={setKPage} />
+        ) : <>
         <div className="topbar">
           <div className="topbar-row">
             <div className="search">
@@ -428,6 +446,7 @@ export default function App() {
             onPick={(n) => addFilter(`cluster:"${n}"`)}
           />
         )}
+        </>}
       </div>
 
       {appSetPage && (
@@ -440,6 +459,19 @@ export default function App() {
           onShowInList={(n) => { setAppSetPage(null); setTab('apps'); setQueryFor('apps', `appset:"${n}"`) }}
           onAction={requestAction}
           notify={notify}
+        />
+      )}
+      {kPage && (
+        <KPageRouter
+          objKey={kPage}
+          left={sidebarCollapsed ? 76 : sidebarWidth}
+          onClose={() => setKPage(null)}
+          notify={notify}
+          onOpenKey={setKPage}
+          onOpenApp={(name) => {
+            const a = [...data.apps.values()].find((x) => x.name === name)
+            if (a) { setKPage(null); setProduct('cd'); setDetail(a.key) } else notify(`Argo CD app ${name} not found in the connected instances`, false)
+          }}
         />
       )}
       {detail && (

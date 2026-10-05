@@ -267,7 +267,10 @@ func workflow(s *Obj, o map[string]any) {
 	sort.Slice(failed, func(i, j int) bool { return failed[i].DisplayName < failed[j].DisplayName })
 	f["failedNodes"] = len(failed)
 	if s.Phase == "Failed" || s.Phase == "Error" {
-		s.Problems = append(s.Problems, Problem{Severity: "error", Source: "workflow", Message: nonEmpty(s.Message, "workflow "+strings.ToLower(s.Phase))})
+		// the failed steps carry the real cause; the workflow message ("child X failed") goes last
+		defer func() {
+			s.Problems = append(s.Problems, Problem{Severity: "error", Source: "workflow", Message: nonEmpty(s.Message, "workflow "+strings.ToLower(s.Phase))})
+		}()
 		for i, n := range failed {
 			if i == 10 {
 				s.Problems = append(s.Problems, Problem{Severity: "error", Source: "workflow", Message: fmt.Sprintf("… and %d more failed steps", len(failed)-10)})
