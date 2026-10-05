@@ -34,3 +34,26 @@ func TestSummarizeSyncFailure(t *testing.T) {
 		t.Fatalf("unexpected: %+v", s)
 	}
 }
+
+func TestBuildTree(t *testing.T) {
+	a := &argocd.Application{Status: argocd.AppStatus{Resources: []argocd.ResourceStatus{
+		{Group: "apps", Kind: "Deployment", Namespace: "ns", Name: "api", Status: "Synced"},
+		{Kind: "ConfigMap", Namespace: "ns", Name: "missing-cm", Status: "OutOfSync"},
+	}}}
+	tree := &argocd.ResourceTree{Nodes: []argocd.ResourceNode{
+		{Group: "apps", Kind: "Deployment", Namespace: "ns", Name: "api", UID: "d1", Health: &argocd.HealthStatus{Status: "Healthy"}},
+		{Group: "apps", Kind: "ReplicaSet", Namespace: "ns", Name: "api-1", UID: "r1", ParentRefs: []argocd.ResourceRef{{UID: "d1", Group: "apps", Kind: "Deployment", Namespace: "ns", Name: "api"}}},
+		{Kind: "Pod", Namespace: "ns", Name: "api-1-x", ParentRefs: []argocd.ResourceRef{{Group: "apps", Kind: "ReplicaSet", Namespace: "ns", Name: "api-1"}},
+			Health: &argocd.HealthStatus{Status: "Degraded", Message: "back-off"}, Info: []argocd.InfoItem{{Name: "Status Reason", Value: "CrashLoopBackOff"}}},
+	}}
+	nodes := buildTree(a, tree)
+	byKind := map[string]TreeNode{}
+	for _, n := range nodes {
+		byKind[n.Kind] = n
+	}
+	if len(nodes) != 4 || !byKind["Deployment"].Managed || !byKind["Deployment"].Restartable ||
+		byKind["ReplicaSet"].Parents[0] != byKind["Deployment"].ID || byKind["Pod"].Parents[0] != byKind["ReplicaSet"].ID ||
+		byKind["Pod"].HealthMsg != "CrashLoopBackOff: back-off" || byKind["ConfigMap"].Health != "Missing" {
+		t.Fatalf("unexpected tree: %+v", nodes)
+	}
+}

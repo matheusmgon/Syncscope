@@ -116,6 +116,7 @@ func (a *app) toJSON() obj {
 		{"group": "apps", "version": "v1", "kind": "Deployment", "namespace": a.NS, "name": "app", "status": a.Sync},
 		{"version": "v1", "kind": "Service", "namespace": a.NS, "name": "app", "status": "Synced"},
 		{"version": "v1", "kind": "ConfigMap", "namespace": a.NS, "name": "app-config", "status": a.Sync},
+		{"group": "networking.k8s.io", "version": "v1", "kind": "Ingress", "namespace": a.NS, "name": "app", "status": "Synced"},
 	}
 	op := obj{"phase": a.Phase, "message": a.OpMsg, "startedAt": a.Finished.Add(-30 * time.Second).Format(time.RFC3339), "retryCount": a.Retry}
 	if a.Phase != "Running" {
@@ -129,8 +130,8 @@ func (a *app) toJSON() obj {
 		"spec": obj{"project": a.Project, "source": obj{"repoURL": a.Repo, "path": a.Path, "targetRevision": "main"},
 			"destination": obj{"server": cs, "namespace": a.NS}, "syncPolicy": obj{"automated": obj{"prune": true, "selfHeal": true}}},
 		"status": obj{
-			"sync":   obj{"status": a.Sync, "revision": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"},
-			"health": obj{"status": a.Health},
+			"sync":           obj{"status": a.Sync, "revision": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"},
+			"health":         obj{"status": a.Health},
 			"operationState": op, "conditions": a.Conditions, "resources": res,
 			"reconciledAt": a.Reconciled.Format(time.RFC3339),
 			"history": []obj{{"id": 1, "revision": "1a2b3c4d5e6f", "deployedAt": a.Finished.Add(-48 * time.Hour).Format(time.RFC3339)},
@@ -372,19 +373,37 @@ func main() {
 			}
 			writeJSON(w, obj{})
 		case sub == "resource-tree":
+			// Deployment -> ReplicaSet -> Pods, Service -> EndpointSlice, ConfigMap.
+			ns := a.NS
+			depH := a.Health
+			if depH == "Unknown" {
+				depH = "Healthy"
+			}
 			nodes := []obj{
-				{"group": "apps", "version": "v1", "kind": "Deployment", "namespace": a.NS, "name": "app", "health": obj{"status": a.Health}},
-				{"version": "v1", "kind": "Service", "namespace": a.NS, "name": "app", "health": obj{"status": "Healthy"}},
+				{"group": "apps", "version": "v1", "kind": "Deployment", "namespace": ns, "name": "app", "uid": "dep", "health": obj{"status": depH},
+					"info": []obj{{"name": "Revision", "value": "Rev:4"}}, "images": []string{"ghcr.io/acme/app:v2.3.1"}},
+				{"group": "apps", "version": "v1", "kind": "ReplicaSet", "namespace": ns, "name": "app-7d9f8b6c5d", "uid": "rs",
+					"parentRefs": []obj{{"group": "apps", "kind": "Deployment", "namespace": ns, "name": "app", "uid": "dep"}},
+					"health":     obj{"status": depH}, "info": []obj{{"name": "Revision", "value": "Rev:4"}}},
+				{"group": "apps", "version": "v1", "kind": "ReplicaSet", "namespace": ns, "name": "app-5c6d7e8f9a", "uid": "rs-old",
+					"parentRefs": []obj{{"group": "apps", "kind": "Deployment", "namespace": ns, "name": "app", "uid": "dep"}},
+					"health":     obj{"status": "Healthy"}, "info": []obj{{"name": "Revision", "value": "Rev:3"}}},
+				{"version": "v1", "kind": "Service", "namespace": ns, "name": "app", "uid": "svc", "health": obj{"status": "Healthy"}},
+				{"group": "discovery.k8s.io", "version": "v1", "kind": "EndpointSlice", "namespace": ns, "name": "app-x7k2p", "uid": "eps",
+					"parentRefs": []obj{{"kind": "Service", "namespace": ns, "name": "app", "uid": "svc"}}},
+				{"version": "v1", "kind": "ConfigMap", "namespace": ns, "name": "app-config", "uid": "cm"},
+				{"group": "networking.k8s.io", "version": "v1", "kind": "Ingress", "namespace": ns, "name": "app", "uid": "ing", "health": obj{"status": "Healthy"}},
 			}
-			for _, d := range a.Degraded {
-				nodes = append(nodes, obj{"version": "v1", "kind": d["kind"], "namespace": a.NS, "name": d["name"],
-					"parentRefs": []obj{{"kind": "ReplicaSet", "name": "app-7d9f8b6c5d"}},
-					"health":     obj{"status": "Degraded", "message": d["msg"]}, "info": []obj{{"name": "Status Reason", "value": d["reason"]}}})
+			for i, d := range a.Degraded {
+				nodes = append(nodes, obj{"version": "v1", "kind": d["kind"], "namespace": ns, "name": d["name"], "uid": fmt.Sprint("bad", i),
+					"parentRefs": []obj{{"group": "apps", "kind": "ReplicaSet", "namespace": ns, "name": "app-7d9f8b6c5d", "uid": "rs"}},
+					"health":     obj{"status": "Degraded", "message": d["msg"]}, "info": []obj{{"name": "Status Reason", "value": d["reason"]}, {"name": "Containers", "value": "0/1"}, {"name": "Restart Count", "value": "17"}}})
 			}
-			if len(a.Degraded) == 0 {
-				nodes = append(nodes, obj{"version": "v1", "kind": "Pod", "namespace": a.NS, "name": "app-7d9f8b6c5d-ab12c",
-					"parentRefs": []obj{{"kind": "ReplicaSet", "name": "app-7d9f8b6c5d"}}, "health": obj{"status": "Healthy"},
-					"info": []obj{{"name": "Status Reason", "value": "Running"}}})
+			for i := 0; i < 2; i++ {
+				nodes = append(nodes, obj{"version": "v1", "kind": "Pod", "namespace": ns, "name": fmt.Sprintf("app-7d9f8b6c5d-ab1%dc", i), "uid": fmt.Sprint("pod", i),
+					"parentRefs": []obj{{"group": "apps", "kind": "ReplicaSet", "namespace": ns, "name": "app-7d9f8b6c5d", "uid": "rs"}},
+					"health":     obj{"status": "Healthy"}, "images": []string{"ghcr.io/acme/app:v2.3.1"},
+					"info": []obj{{"name": "Status Reason", "value": "Running"}, {"name": "Containers", "value": "1/1"}, {"name": "Node", "value": "gke-pool-1-a1b2"}}})
 			}
 			writeJSON(w, obj{"nodes": nodes})
 		default:

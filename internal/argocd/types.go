@@ -168,10 +168,12 @@ type ResourceNode struct {
 	ParentRefs []ResourceRef `json:"parentRefs,omitempty"`
 	Health     *HealthStatus `json:"health,omitempty"`
 	Info       []InfoItem    `json:"info,omitempty"`
+	Images     []string      `json:"images,omitempty"`
 	CreatedAt  string        `json:"createdAt,omitempty"`
 }
 
 type ResourceRef struct {
+	UID       string `json:"uid,omitempty"`
 	Group     string `json:"group,omitempty"`
 	Kind      string `json:"kind"`
 	Namespace string `json:"namespace,omitempty"`

@@ -171,6 +171,7 @@ type AppDetail struct {
 	Prune      bool                     `json:"prune"`
 	SelfHeal   bool                     `json:"selfHeal"`
 	TreeError  string                   `json:"treeError,omitempty"`
+	Tree       []TreeNode               `json:"tree"`
 }
 
 func (m *Manager) Detail(key string) (*AppDetail, error) {
@@ -269,6 +270,7 @@ func (m *Manager) Detail(key string) (*AppDetail, error) {
 			d.Pods = append(d.Pods, row)
 		}
 	}
+	d.Tree = buildTree(a, tree)
 	if treeErr != nil {
 		d.TreeError = treeErr.Error()
 	}

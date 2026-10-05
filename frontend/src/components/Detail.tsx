@@ -4,6 +4,7 @@ import * as API from '../../wailsjs/go/main/App'
 import { getApp, useData } from '../data'
 import { HealthIcon, Pill, SyncIcon, ago } from './Status'
 import { ProblemList } from './Problems'
+import { ResourceTree } from './ResourceTree'
 
 type Props = {
   appKey: string
@@ -11,9 +12,14 @@ type Props = {
   onClose: () => void
   onAction: (action: 'sync' | 'refresh' | 'hard' | 'restart' | 'terminate', keys: string[]) => void
   notify: (msg: string, ok: boolean) => void
+  left: number
 }
 
-export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
+type DetailTab = 'tree' | 'summary' | 'resources'
+
+export function Detail({ appKey, ctxName, onClose, onAction, notify, left }: Props) {
+  const [tab, setTab] = useState<DetailTab>('tree')
+  const [showProblems, setShowProblems] = useState(true)
   const { version } = useData()
   const live = getApp(appKey)
   const [d, setD] = useState<store.AppDetail | null>(null)
@@ -56,13 +62,12 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
 
   return (
     <>
-      <div className="drawer-backdrop" onClick={onClose} />
-      <div className="drawer">
+      <div className="drawer page" style={{ left }}>
         <header>
           <h2>
             <HealthIcon status={s.health} />
             <span className="selectable">{s.name}</span>
-            <button className="x" onClick={onClose} title="Close (Esc)">✕</button>
+            <button className="btn ghost sm back" onClick={onClose} title="Back to applications (Esc)">← Applications</button>
           </h2>
           <div className="meta">
             {ctxName} · project <b>{s.project}</b>
@@ -83,18 +88,44 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
             <span className="spacer" />
             <button className="btn ghost" onClick={() => API.OpenInArgo(appKey)}>Open in Argo CD ↗</button>
           </div>
+          <div className="tabs detail-tabs">
+            <div className={'tab' + (tab === 'tree' ? ' active' : '')} onClick={() => setTab('tree')}>Tree</div>
+            <div className={'tab' + (tab === 'summary' ? ' active' : '')} onClick={() => setTab('summary')}>Summary</div>
+            <div className={'tab' + (tab === 'resources' ? ' active' : '')} onClick={() => setTab('resources')}>
+              Resources <span className="badge">{d?.resources?.length ?? 0}</span>
+            </div>
+          </div>
         </header>
+        {problems.length > 0 && (
+          <div className="detail-problems selectable">
+            <div className="dp-head" onClick={() => setShowProblems(!showProblems)}>
+              <b>Why it is failing</b> <span className={'badge ' + (problems.some((p) => p.severity === 'error') ? 'error' : 'warning')}>{problems.length}</span>
+              {!showProblems && <span className="dp-first">{(problems[0].resource ? problems[0].resource + ': ' : '') + problems[0].message}</span>}
+              <span className="spacer" />
+              <span className="muted-sm">{showProblems ? 'hide' : 'show'}</span>
+            </div>
+            {showProblems && <ProblemList problems={problems} />}
+          </div>
+        )}
+        {err && <div className="alert" style={{ margin: '12px 20px 0' }}>Could not load details: {err}</div>}
+        {tab === 'tree' && (
+          <div className="body tree-body">
+            {d ? (
+              <ResourceTree
+                app={s}
+                nodes={d.tree ?? []}
+                onRestart={(n) => restartOne(store.ResourceRow.createFrom({ group: n.group, version: n.version, kind: n.kind, namespace: n.namespace, name: n.name }))}
+              />
+            ) : (
+              <div className="empty">{loading ? 'Loading resource tree…' : 'No data'}</div>
+            )}
+            {d?.treeError && <div className="alert" style={{ margin: 12 }}>resource-tree: {d.treeError}</div>}
+          </div>
+        )}
+        {tab !== 'tree' && (
         <div className="body selectable">
-          {err && <div className="alert" style={{ marginBottom: 16 }}>Could not load details: {err}</div>}
 
-          {problems.length > 0 && (
-            <section>
-              <h4>Why it is failing</h4>
-              <ProblemList problems={problems} />
-            </section>
-          )}
-
-          {op && (
+          {tab === 'summary' && op && (
             <section>
               <h4>Last operation</h4>
               <div className="kv">
@@ -125,7 +156,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
             </section>
           )}
 
-          <section>
+          {tab === 'summary' && <section>
             <h4>Source and destination</h4>
             <div className="kv">
               {(d?.sources ?? []).map((src, i) => (
@@ -138,15 +169,15 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
               <div className="k">Reconciled</div>
               <div className="v">{s.reconciledAt ? `${ago(s.reconciledAt)} ago` : '—'}</div>
             </div>
-          </section>
+          </section>}
 
-          <section>
+          {tab === 'resources' && <section>
             <h4>Resources {loading && <span style={{ textTransform: 'none' }}>· loading…</span>}</h4>
             {d?.treeError && <div className="alert" style={{ marginBottom: 8 }}>resource-tree: {d.treeError}</div>}
             <ResourceTable rows={d?.resources ?? []} onRestart={restartOne} />
-          </section>
+          </section>}
 
-          {(d?.pods?.length ?? 0) > 0 && (
+          {tab === 'resources' && (d?.pods?.length ?? 0) > 0 && (
             <section>
               <h4>Pods</h4>
               <table className="mini-table">
@@ -165,7 +196,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
             </section>
           )}
 
-          {(d?.conditions?.length ?? 0) > 0 && (
+          {tab === 'summary' && (d?.conditions?.length ?? 0) > 0 && (
             <section>
               <h4>Conditions</h4>
               <table className="mini-table">
@@ -181,7 +212,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
             </section>
           )}
 
-          {(d?.history?.length ?? 0) > 0 && (
+          {tab === 'summary' && (d?.history?.length ?? 0) > 0 && (
             <section>
               <h4>Deploy history</h4>
               <table className="mini-table">
@@ -199,6 +230,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify }: Props) {
             </section>
           )}
         </div>
+        )}
       </div>
     </>
   )

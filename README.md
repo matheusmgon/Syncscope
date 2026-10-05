@@ -34,6 +34,13 @@ Argo CD instances.
   apply-out-of-sync-only), Refresh, Hard refresh, Restart (all Deployments,
   StatefulSets, DaemonSets and Rollouts), Terminate operation. Group headers
   (by ApplicationSet, cluster, project, instance) can be selected as a whole.
+- **Application view like Argo CD**: full-page detail with a **Tree** tab (resource
+  graph Application → Deployment → ReplicaSet → Pod, edges highlighted in red on the
+  failing path, collapse/expand, filter, "only unhealthy", zoom with ⌘+wheel and
+  Fit, side panel per resource with health message, info and restart), plus
+  **Summary** and **Resources** tabs.
+- **List or Tiles** for the applications page (tiles mirror the Argo CD cards).
+- Collapsible / resizable sidebar (⌘B).
 - Argo CD look & feel, light and dark themes.
 
 ## Authentication

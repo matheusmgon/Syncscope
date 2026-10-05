@@ -401,3 +401,101 @@ details summary { cursor: pointer; color: var(--fg-muted); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- full-page application view ---------- */
+.drawer.page {
+  width: auto; right: 0; box-shadow: none; border-left: 1px solid var(--border); animation: fadein .12s ease-out;
+}
+@keyframes fadein { from { opacity: 0 } }
+.drawer.page header { padding: 30px 20px 0; }
+.drawer.page h2 .back { margin-left: auto; }
+.detail-tabs { margin-top: 8px; }
+.detail-problems {
+  border-bottom: 1px solid var(--error); background: var(--error-bg); padding: 8px 20px 10px; max-height: 32vh; overflow-y: auto;
+}
+.detail-problems .problem-box { background: var(--panel); }
+.dp-head { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--error-fg); margin-bottom: 6px; }
+.dp-first { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1; font-size: 12px; }
+.muted-sm { color: var(--fg-muted); font-size: 12px; }
+.body.tree-body { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---------- resource tree ---------- */
+.rtree { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.rtree-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2);
+}
+.rtree-filter {
+  border: 1px solid var(--border); background: var(--panel); border-radius: var(--radius); padding: 4px 8px; width: 220px; outline: 0;
+}
+.rtree-filter:focus { border-color: var(--teal); }
+.rtree-main { flex: 1; display: flex; min-height: 0; }
+.rtree-canvas {
+  flex: 1; overflow: auto; background: var(--bg);
+  background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 18px 18px;
+}
+.rtree-edges { position: absolute; left: 0; top: 0; pointer-events: none; }
+.rtree-edges path { fill: none; stroke: var(--fg-faint); stroke-width: 1.3; opacity: .7; }
+.rtree-edges path.bad { stroke: var(--error); opacity: 1; stroke-width: 1.6; }
+.rnode {
+  position: absolute; width: 250px; height: 52px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0 10px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08); margin-left: 20px;
+}
+.rnode:hover { border-color: var(--fg-faint); }
+.rnode.selected { border-color: var(--teal); box-shadow: 0 0 0 2px var(--teal-soft); }
+.rnode.app { border-color: var(--teal); border-width: 2px; cursor: default; }
+.rnode.child { background: var(--panel-2); }
+.rnode.degraded { border-color: var(--error); background: var(--error-bg); }
+.rnode.missing { border-color: var(--warning); border-style: dashed; }
+.rnode.oos { border-color: var(--outofsync); }
+.rnode-text { flex: 1; min-width: 0; }
+.rnode-name { font-weight: 600; font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rnode-kind { font-size: 11px; color: var(--fg-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rnode-kind.err { color: var(--error-fg); }
+.rnode-status { display: flex; gap: 2px; }
+.rnode-toggle {
+  position: absolute; right: -11px; top: 50%; transform: translateY(-50%); min-width: 20px; height: 20px; padding: 0 4px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--panel); font-size: 11px; cursor: pointer; color: var(--fg-muted);
+}
+.rnode-toggle:hover { border-color: var(--teal); color: var(--teal); }
+.kicon {
+  width: 34px; height: 34px; border-radius: 50%; background: #326ce5; color: #fff; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 9.5px; font-weight: 700; letter-spacing: .2px;
+}
+.kicon.app { background: var(--teal); }
+.rtree-side {
+  width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--panel); overflow-y: auto; padding: 14px 16px;
+}
+.rtree-side-head { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.rtree-side .kv { grid-template-columns: 110px 1fr; font-size: 12px; }
+.rtree-side .v { white-space: pre-wrap; }
+
+/* ---------- tiles ---------- */
+.tiles { flex: 1; overflow-y: auto; background: var(--bg); }
+.tile {
+  position: absolute; background: var(--panel); border-radius: 6px; border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--unknown); box-shadow: 0 1px 2px rgba(0,0,0,.06); padding: 10px 12px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 8px; overflow: hidden;
+}
+.tile:hover { box-shadow: var(--shadow); }
+.tile.h-healthy { border-left-color: var(--healthy); }
+.tile.h-progressing { border-left-color: var(--progressing); }
+.tile.h-degraded { border-left-color: var(--degraded); }
+.tile.h-suspended { border-left-color: var(--suspended); }
+.tile.h-missing { border-left-color: var(--missing); }
+.tile.selected { background: var(--selected); }
+.tile.focused { outline: 2px solid var(--teal); }
+.tile-head { display: flex; align-items: center; gap: 8px; }
+.tile-name { flex: 1; font-weight: 600; font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tile-grid { display: grid; grid-template-columns: 96px 1fr; gap: 3px 8px; font-size: 12px; }
+.tile-grid .k { color: var(--fg-muted); }
+.tile-grid .v { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; gap: 3px; }
+.tile-grid .sub { color: var(--fg-faint); margin-left: 6px; }
+.tile .link:hover { color: var(--teal); text-decoration: underline; }
+.tile-problem {
+  margin-top: auto; font-size: 12px; color: var(--error-fg); background: var(--error-bg); border-radius: 4px; padding: 4px 8px;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.tile-problem.warn { color: var(--warning-fg); background: var(--warning-bg); }
+.tile-actions { margin-top: auto; display: flex; gap: 6px; }
+.seg.small button { padding: 3px 10px; font-size: 12px; }

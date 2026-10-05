@@ -346,6 +346,50 @@ export namespace store {
 		}
 	}
 	
+	export class TreeNode {
+	    id: string;
+	    group: string;
+	    version: string;
+	    kind: string;
+	    namespace: string;
+	    name: string;
+	    parents: string[];
+	    health: string;
+	    healthMsg?: string;
+	    sync?: string;
+	    managed: boolean;
+	    hook: boolean;
+	    prune: boolean;
+	    restartable: boolean;
+	    info?: Record<string, string>;
+	    images?: string[];
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TreeNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.group = source["group"];
+	        this.version = source["version"];
+	        this.kind = source["kind"];
+	        this.namespace = source["namespace"];
+	        this.name = source["name"];
+	        this.parents = source["parents"];
+	        this.health = source["health"];
+	        this.healthMsg = source["healthMsg"];
+	        this.sync = source["sync"];
+	        this.managed = source["managed"];
+	        this.hook = source["hook"];
+	        this.prune = source["prune"];
+	        this.restartable = source["restartable"];
+	        this.info = source["info"];
+	        this.images = source["images"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class ResourceRow {
 	    group: string;
 	    version: string;
@@ -494,6 +538,7 @@ export namespace store {
 	    prune: boolean;
 	    selfHeal: boolean;
 	    treeError?: string;
+	    tree: TreeNode[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AppDetail(source);
@@ -512,6 +557,7 @@ export namespace store {
 	        this.prune = source["prune"];
 	        this.selfHeal = source["selfHeal"];
 	        this.treeError = source["treeError"];
+	        this.tree = this.convertValues(source["tree"], TreeNode);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -625,6 +671,7 @@ export namespace store {
 	        this.synced = source["synced"];
 	    }
 	}
+	
 	
 
 }

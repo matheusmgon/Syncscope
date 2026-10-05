@@ -5,6 +5,7 @@ import { startData, useData, type App as AppRow } from './data'
 import { filterApps, sortApps, type SortKey } from './search'
 import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
 import { AppTable, type GroupBy } from './components/AppTable'
+import { AppTiles } from './components/AppTiles'
 import { Detail } from './components/Detail'
 import { ProblemsView } from './components/Problems'
 import { ConfirmAction, ContextDialog, LoginDialog, Toasts, type ActionKind, type Toast } from './components/Dialogs'
@@ -49,6 +50,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [theme, setTheme] = useState<string>(() => load('theme', window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => load('sidebarCollapsed', false))
+  const [view, setView] = useState<'list' | 'tiles'>(() => load('view', 'list'))
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => load('sidebarWidth', SIDEBAR_DEFAULT))
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -58,6 +60,7 @@ export default function App() {
   useEffect(() => save('sort', sort), [sort])
   useEffect(() => save('sidebarCollapsed', sidebarCollapsed), [sidebarCollapsed])
   useEffect(() => save('sidebarWidth', sidebarWidth), [sidebarWidth])
+  useEffect(() => save('view', view), [view])
 
   const refreshContexts = useCallback(() => API.Contexts().then((c) => setContexts(c ?? [])), [])
   useEffect(() => { refreshContexts() }, [refreshContexts, data.statuses])
@@ -298,6 +301,11 @@ export default function App() {
                 ⚠ Failing only<span className="n">{facet.err}</span>
               </span>
               <span className="spacer" />
+              <div className="seg small" title="View">
+                <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>☰ List</button>
+                <button className={view === 'tiles' ? 'on' : ''} onClick={() => setView('tiles')}>▦ Tiles</button>
+              </div>
+              {view === 'list' && <>
               <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Group by</span>
               <select className="inline" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
                 <option value="none">no grouping</option>
@@ -306,6 +314,7 @@ export default function App() {
                 <option value="project">Project</option>
                 <option value="ctx">Argo CD instance</option>
               </select>
+              </>}
             </div>
             {selected.size > 0 && (
               <div className="actionbar">
@@ -329,6 +338,17 @@ export default function App() {
                   <><h3>Connecting…</h3>Waiting for the instances to respond.</>
                 )}
               </div>
+            ) : view === 'tiles' ? (
+              <AppTiles
+                apps={filtered}
+                ctxNames={ctxNames}
+                selected={selected}
+                setSelected={setSelected}
+                focused={focused}
+                onOpen={(k) => { setFocused(k); setDetail(k) }}
+                onAction={requestAction}
+                onAddFilter={addFilter}
+              />
             ) : (
               <AppTable
                 apps={filtered}
@@ -384,6 +404,7 @@ export default function App() {
           onClose={() => setDetail(null)}
           onAction={requestAction}
           notify={notify}
+          left={sidebarCollapsed ? 56 : sidebarWidth}
         />
       )}
       {editCtx && (
