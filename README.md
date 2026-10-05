@@ -170,6 +170,46 @@ sync windows, image updater integration, "open a PR instead of editing the spec"
 - **Argo Workflows** (workflows, templates, logs), **Argo Rollouts** (canary /
   blue-green status, promote, abort), **Argo Events** (event sources, sensors).
 
+<!-- distribution & quality (phase 2) -->
+
+## Install
+
+Download the latest build from the GitHub **Releases** page and verify it
+against `SHA256SUMS` (`shasum -a 256 -c SHA256SUMS --ignore-missing`):
+
+- **macOS** (Apple Silicon and Intel): `Syncscope_<version>_darwin_universal.zip`
+  — unzip and move `Syncscope.app` to `/Applications`. Release builds are
+  signed and notarized when signing is configured; for an unsigned build,
+  right-click → *Open* the first time.
+- **Windows**: `Syncscope_<version>_windows_amd64_installer.exe`, or the
+  portable `.zip`. Requires the WebView2 runtime (preinstalled on Windows 11;
+  the installer fetches it if missing).
+- **Linux** (x86-64): `Syncscope_<version>_linux_amd64.tar.gz`. Needs GTK 3 and
+  WebKitGTK 4.1 (`sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0`).
+
+Or build from source (see Development).
+
+## Development and testing
+
+`scripts/dev.sh` starts two mock Argo CD instances (`:8099`, `:8098`) and
+`wails dev` with an isolated config and no keychain. Frontend unit tests use
+Vitest (`cd frontend && npm test`). An end-to-end suite (`scripts/e2e`) runs
+the API client against a real Argo CD in kind.
+
+CI (`.github/workflows/ci.yml`) runs on every push and PR: `go vet`, unit
+tests, integration tests against `cmd/mockargo`, `tsc` + Vitest, and a Wails
+build on macOS, Windows and Linux. `e2e.yml` runs weekly and on demand.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commands and conventions.
+
+## Releasing
+
+Push a `v*` tag (e.g. `git tag -a v0.2.0 -m v0.2.0 && git push origin v0.2.0`).
+`.github/workflows/release.yml` builds macOS (universal), Windows (NSIS
+installer) and Linux, optionally signs and notarizes the macOS app, writes
+`SHA256SUMS` and publishes a GitHub Release. Details and the required signing
+secrets: [docs/RELEASING.md](docs/RELEASING.md).
+
 ## License
 
 [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
