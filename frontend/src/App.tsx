@@ -3,7 +3,7 @@ import { argocd, config } from '../wailsjs/go/models'
 import * as API from '../wailsjs/go/main/App'
 import { startData, useData, type App as AppRow } from './data'
 import { filterApps, sortApps, type SortKey } from './search'
-import { Sidebar } from './components/Sidebar'
+import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
 import { AppTable, type GroupBy } from './components/AppTable'
 import { Detail } from './components/Detail'
 import { ProblemsView } from './components/Problems'
@@ -48,12 +48,16 @@ export default function App() {
   const [confirm, setConfirm] = useState<{ kind: ActionKind; keys: string[] } | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [theme, setTheme] = useState<string>(() => load('theme', window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => load('sidebarCollapsed', false))
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => load('sidebarWidth', SIDEBAR_DEFAULT))
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { startData() }, [])
   useEffect(() => { document.documentElement.dataset.theme = theme; save('theme', theme) }, [theme])
   useEffect(() => save('groupBy', groupBy), [groupBy])
   useEffect(() => save('sort', sort), [sort])
+  useEffect(() => save('sidebarCollapsed', sidebarCollapsed), [sidebarCollapsed])
+  useEffect(() => save('sidebarWidth', sidebarWidth), [sidebarWidth])
 
   const refreshContexts = useCallback(() => API.Contexts().then((c) => setContexts(c ?? [])), [])
   useEffect(() => { refreshContexts() }, [refreshContexts, data.statuses])
@@ -133,6 +137,11 @@ export default function App() {
         searchRef.current?.select()
         return
       }
+      if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSidebarCollapsed((c) => !c)
+        return
+      }
       if (inInput) {
         if (e.key === 'Escape') (e.target as HTMLElement).blur()
         if (e.key === 'ArrowDown' && e.target === searchRef.current) {
@@ -210,6 +219,10 @@ export default function App() {
         }}
         theme={theme}
         onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        collapsed={sidebarCollapsed}
+        onCollapse={setSidebarCollapsed}
+        width={sidebarWidth}
+        onResize={setSidebarWidth}
       />
       <div className="main">
         <div className="topbar">

@@ -21,7 +21,7 @@ Argo CD instances.
   | `label:team=core`, `label:team` | labels |
   | `is:error` `is:warning` `is:problem` `is:running` `is:auto` `is:manual` `is:deleting` | computed state |
 
-  Shortcuts: `⌘K` or `/` search · `↑/↓` or `j/k` move · `Enter` open · `Space` select ·
+  Shortcuts: `⌘B` toggle sidebar · `⌘K` or `/` search · `↑/↓` or `j/k` move · `Enter` open · `Space` select ·
   `⌘A` select all results · `Esc` clear.
 - **Visible errors**: every app gets a list of problems that says *what* failed
   and *why*: failed sync operation and each failed resource/hook with its

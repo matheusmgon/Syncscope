@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { store } from '../../wailsjs/go/models'
 import type { App } from '../data'
 
@@ -19,7 +19,15 @@ type Props = {
   onImport: () => void
   theme: string
   onTheme: () => void
+  collapsed: boolean
+  onCollapse: (collapsed: boolean) => void
+  width: number
+  onResize: (width: number) => void
 }
+
+export const SIDEBAR_MIN = 180
+export const SIDEBAR_MAX = 520
+export const SIDEBAR_DEFAULT = 236
 
 export function Sidebar(p: Props) {
   const counts = useMemo(() => {
@@ -35,11 +43,75 @@ export function Sidebar(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.version])
 
+  const dragging = useRef(false)
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragging.current = true
+    const startX = e.clientX
+    const startW = p.width
+    document.body.classList.add('resizing')
+    const move = (ev: MouseEvent) => {
+      const w = startW + ev.clientX - startX
+      // dragging far to the left closes the sidebar, like most desktop apps
+      if (w < SIDEBAR_MIN - 60) {
+        stop()
+        p.onCollapse(true)
+        return
+      }
+      p.onResize(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, w)))
+    }
+    const stop = () => {
+      dragging.current = false
+      document.body.classList.remove('resizing')
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', stop)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', stop)
+  }
+
+  if (p.collapsed) {
+    return (
+      <aside className="sidebar rail">
+        <button className="rail-btn toggle" title="Show sidebar (⌘B)" onClick={() => p.onCollapse(false)}>»</button>
+        <div className="contexts">
+          {p.statuses.map((s) => {
+            const c = counts.get(s.id)
+            return (
+              <div
+                key={s.id}
+                className={'rail-ctx' + (p.selected.has(s.id) ? ' active' : '')}
+                title={`${s.name} — ${stateLabel[s.state] ?? s.state}${c ? ` · ${c.n} apps${c.err ? `, ${c.err} failing` : ''}` : ''}\n${s.server}`}
+                onClick={(e) => (s.state === 'auth' ? p.onLogin(s.id) : p.onToggle(s.id, e.metaKey || e.ctrlKey || e.shiftKey))}
+              >
+                <span className="rail-initial" style={s.color ? { borderColor: s.color } : undefined}>{s.name.slice(0, 2)}</span>
+                <span className={'dot ' + s.state} />
+                {!!c?.err && <span className="rail-err">{c.err > 999 ? '999+' : c.err}</span>}
+              </div>
+            )
+          })}
+        </div>
+        <div className="footer">
+          <button className="rail-btn" title="Add instance" onClick={p.onAdd}>＋</button>
+          <button className="rail-btn" title="Import from argocd CLI" onClick={p.onImport}>⇣</button>
+          <button className="rail-btn" title={p.theme === 'dark' ? 'Light theme' : 'Dark theme'} onClick={p.onTheme}>{p.theme === 'dark' ? '☀' : '☾'}</button>
+        </div>
+      </aside>
+    )
+  }
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width: p.width }}>
+      <div
+        className="resizer"
+        onMouseDown={startResize}
+        onDoubleClick={() => p.onResize(SIDEBAR_DEFAULT)}
+        title="Drag to resize · double-click to reset"
+      />
       <div className="brand">
         <div className="logo">A</div>
-        ArgoDeck
+        <span style={{ flex: 1 }}>ArgoDeck</span>
+        <button className="rail-btn toggle" title="Hide sidebar (⌘B)" onClick={() => p.onCollapse(true)}>«</button>
       </div>
       <div className="section-title">
         <span>Argo CD instances</span>
