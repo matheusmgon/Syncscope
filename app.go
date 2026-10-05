@@ -7,6 +7,8 @@ import (
 
 	"syncscope/internal/argocd"
 	"syncscope/internal/config"
+	"syncscope/internal/kube"
+	"syncscope/internal/kubestore"
 	"syncscope/internal/store"
 )
 
@@ -15,6 +17,7 @@ type App struct {
 	ctx context.Context
 	cfg *config.Store
 	m   *store.Manager
+	k   *kubestore.Manager
 }
 
 func NewApp(cfg *config.Store) *App {
@@ -32,6 +35,8 @@ func (a *App) startup(ctx context.Context) {
 	a.m = store.NewManager(a.cfg, func(ev string, data any) { runtime.EventsEmit(ctx, ev, data) })
 	a.m.OpenBrowser = func(u string) { runtime.BrowserOpenURL(ctx, u) }
 	a.m.Start(ctx)
+	a.k = kubestore.NewManager(a.cfg, func(ev string, data any) { runtime.EventsEmit(ctx, ev, data) })
+	a.k.Start(ctx)
 }
 
 // ---- contexts ----
@@ -81,7 +86,12 @@ func (a *App) Containers(key string, r argocd.ResourceAction) ([]string, error) 
 func (a *App) StartLogs(key string, req store.LogRequest) (string, error) {
 	return a.m.StartLogs(key, req)
 }
-func (a *App) StopLogs(id string) { a.m.StopLogs(id) }
+
+// StopLogs stops an Argo CD or a Kubernetes log stream.
+func (a *App) StopLogs(id string) {
+	a.m.StopLogs(id)
+	a.k.StopLogs(id)
+}
 
 func (a *App) Delete(keys []string, o store.DeleteOptions) store.ActionReport {
 	return a.m.Delete(keys, o)
@@ -146,3 +156,30 @@ func (a *App) OpenURL(u string) { runtime.BrowserOpenURL(a.ctx, u) }
 
 func (a *App) Prefs() config.Prefs           { return a.cfg.Prefs() }
 func (a *App) SetPrefs(p config.Prefs) error { return a.cfg.SetPrefs(p) }
+
+// ---- Kubernetes-backed Argo tools (Workflows, Events, Rollouts) ----
+
+func (a *App) KubeContexts() ([]kubestore.ContextView, error) { return a.k.Contexts() }
+func (a *App) KubeconfigPaths() []string                      { return kube.KubeconfigPaths() }
+func (a *App) SetKubeContexts(names []string) error           { return a.k.SetEnabled(names) }
+func (a *App) KubeReconnect(name string)                      { a.k.Reconnect(name) }
+func (a *App) KubeStatuses() []kubestore.ContextStatus        { return a.k.Statuses() }
+func (a *App) KObjects() []kubestore.Obj                      { return a.k.Objects() }
+func (a *App) KObject(key string) (map[string]any, error)     { return a.k.Object(key) }
+func (a *App) KYAML(key string) (string, error)               { return a.k.YAML(key) }
+func (a *App) KSaveYAML(key, y string) error                  { return a.k.SaveYAML(key, y) }
+func (a *App) KDelete(key string) error                       { return a.k.DeleteObject(key) }
+func (a *App) KPods(key string) ([]kube.PodInfo, error)       { return a.k.Pods(key) }
+func (a *App) KEvents(key string) ([]kube.Event, error)       { return a.k.Events(key) }
+func (a *App) KStartLogs(r kubestore.LogRequest) (string, error) {
+	return a.k.StartLogs(r)
+}
+func (a *App) RolloutAction(key, action string) error { return a.k.RolloutAction(key, action) }
+func (a *App) WorkflowAction(key, action string) (string, error) {
+	return a.k.WorkflowAction(key, action)
+}
+func (a *App) SubmitTemplate(key string, params map[string]string) (string, error) {
+	return a.k.SubmitTemplate(key, params)
+}
+func (a *App) CronAction(key, action string) (string, error) { return a.k.CronAction(key, action) }
+func (a *App) RestartPods(key string) (int, error)           { return a.k.RestartPods(key) }

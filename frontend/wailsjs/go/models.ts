@@ -284,6 +284,7 @@ export namespace config {
 	}
 	export class Prefs {
 	    theme?: string;
+	    kubeContexts?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Prefs(source);
@@ -292,7 +293,253 @@ export namespace config {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.kubeContexts = source["kubeContexts"];
 	    }
+	}
+
+}
+
+export namespace kube {
+	
+	export class Event {
+	    type: string;
+	    reason: string;
+	    message: string;
+	    count: number;
+	    first: string;
+	    last: string;
+	    object: string;
+	    component: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Event(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.reason = source["reason"];
+	        this.message = source["message"];
+	        this.count = source["count"];
+	        this.first = source["first"];
+	        this.last = source["last"];
+	        this.object = source["object"];
+	        this.component = source["component"];
+	    }
+	}
+	export class PodInfo {
+	    name: string;
+	    namespace: string;
+	    phase: string;
+	    reason?: string;
+	    node?: string;
+	    containers: string[];
+	    init?: string[];
+	    ready: string;
+	    restarts: number;
+	    created: string;
+	    annotations?: Record<string, string>;
+	    labels?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new PodInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.namespace = source["namespace"];
+	        this.phase = source["phase"];
+	        this.reason = source["reason"];
+	        this.node = source["node"];
+	        this.containers = source["containers"];
+	        this.init = source["init"];
+	        this.ready = source["ready"];
+	        this.restarts = source["restarts"];
+	        this.created = source["created"];
+	        this.annotations = source["annotations"];
+	        this.labels = source["labels"];
+	    }
+	}
+
+}
+
+export namespace kubestore {
+	
+	export class KindState {
+	    state: string;
+	    message?: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new KindState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.message = source["message"];
+	        this.count = source["count"];
+	    }
+	}
+	export class ContextStatus {
+	    name: string;
+	    server: string;
+	    version?: string;
+	    state: string;
+	    message?: string;
+	    kinds: Record<string, KindState>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.server = source["server"];
+	        this.version = source["version"];
+	        this.state = source["state"];
+	        this.message = source["message"];
+	        this.kinds = this.convertValues(source["kinds"], KindState, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ContextView {
+	    name: string;
+	    cluster: string;
+	    server: string;
+	    namespace: string;
+	    user: string;
+	    current: boolean;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.cluster = source["cluster"];
+	        this.server = source["server"];
+	        this.namespace = source["namespace"];
+	        this.user = source["user"];
+	        this.current = source["current"];
+	        this.enabled = source["enabled"];
+	    }
+	}
+	
+	export class LogRequest {
+	    ctx: string;
+	    namespace: string;
+	    pod: string;
+	    container: string;
+	    tailLines: number;
+	    follow: boolean;
+	    previous: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LogRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ctx = source["ctx"];
+	        this.namespace = source["namespace"];
+	        this.pod = source["pod"];
+	        this.container = source["container"];
+	        this.tailLines = source["tailLines"];
+	        this.follow = source["follow"];
+	        this.previous = source["previous"];
+	    }
+	}
+	export class Problem {
+	    severity: string;
+	    source: string;
+	    resource?: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Problem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.severity = source["severity"];
+	        this.source = source["source"];
+	        this.resource = source["resource"];
+	        this.message = source["message"];
+	    }
+	}
+	export class Obj {
+	    key: string;
+	    ctx: string;
+	    kind: string;
+	    namespace: string;
+	    name: string;
+	    phase: string;
+	    message?: string;
+	    severity: number;
+	    problems?: Problem[];
+	    labels?: Record<string, string>;
+	    created: string;
+	    fields: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new Obj(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.ctx = source["ctx"];
+	        this.kind = source["kind"];
+	        this.namespace = source["namespace"];
+	        this.name = source["name"];
+	        this.phase = source["phase"];
+	        this.message = source["message"];
+	        this.severity = source["severity"];
+	        this.problems = this.convertValues(source["problems"], Problem);
+	        this.labels = source["labels"];
+	        this.created = source["created"];
+	        this.fields = source["fields"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

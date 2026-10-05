@@ -3,6 +3,8 @@
 import {store} from '../models';
 import {argocd} from '../models';
 import {config} from '../models';
+import {kube} from '../models';
+import {kubestore} from '../models';
 
 export function AppEvents(arg1:string):Promise<Array<store.EventRow>>;
 
@@ -28,6 +30,8 @@ export function Containers(arg1:string,arg2:argocd.ResourceAction):Promise<Array
 
 export function Contexts():Promise<Array<config.Context>>;
 
+export function CronAction(arg1:string,arg2:string):Promise<string>;
+
 export function Delete(arg1:Array<string>,arg2:store.DeleteOptions):Promise<store.ActionReport>;
 
 export function DeleteAppSet(arg1:string):Promise<void>;
@@ -43,6 +47,30 @@ export function Diff(arg1:string):Promise<Array<store.DiffItem>>;
 export function History(arg1:string):Promise<Array<store.HistoryEntry>>;
 
 export function ImportCLI():Promise<number>;
+
+export function KDelete(arg1:string):Promise<void>;
+
+export function KEvents(arg1:string):Promise<Array<kube.Event>>;
+
+export function KObject(arg1:string):Promise<Record<string, any>>;
+
+export function KObjects():Promise<Array<kubestore.Obj>>;
+
+export function KPods(arg1:string):Promise<Array<kube.PodInfo>>;
+
+export function KSaveYAML(arg1:string,arg2:string):Promise<void>;
+
+export function KStartLogs(arg1:kubestore.LogRequest):Promise<string>;
+
+export function KYAML(arg1:string):Promise<string>;
+
+export function KubeContexts():Promise<Array<kubestore.ContextView>>;
+
+export function KubeReconnect(arg1:string):Promise<void>;
+
+export function KubeStatuses():Promise<Array<kubestore.ContextStatus>>;
+
+export function KubeconfigPaths():Promise<Array<string>>;
 
 export function LoginPassword(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
@@ -72,9 +100,13 @@ export function ResourceYAML(arg1:string,arg2:argocd.ResourceAction):Promise<str
 
 export function Restart(arg1:Array<string>):Promise<store.ActionReport>;
 
+export function RestartPods(arg1:string):Promise<number>;
+
 export function RestartResource(arg1:string,arg2:argocd.ResourceAction):Promise<void>;
 
 export function Rollback(arg1:string,arg2:number,arg3:boolean,arg4:boolean):Promise<void>;
+
+export function RolloutAction(arg1:string,arg2:string):Promise<void>;
 
 export function RunAction(arg1:string,arg2:argocd.ResourceAction,arg3:string):Promise<void>;
 
@@ -83,6 +115,8 @@ export function SaveAppYAML(arg1:string,arg2:string):Promise<void>;
 export function SaveContext(arg1:config.Context):Promise<config.Context>;
 
 export function SaveSource(arg1:string,arg2:number,arg3:Record<string, any>):Promise<void>;
+
+export function SetKubeContexts(arg1:Array<string>):Promise<void>;
 
 export function SetPrefs(arg1:config.Prefs):Promise<void>;
 
@@ -96,6 +130,8 @@ export function Statuses():Promise<Array<store.ContextStatus>>;
 
 export function StopLogs(arg1:string):Promise<void>;
 
+export function SubmitTemplate(arg1:string,arg2:Record<string, string>):Promise<string>;
+
 export function Sync(arg1:Array<string>,arg2:argocd.SyncOptions):Promise<store.ActionReport>;
 
 export function TermClose(arg1:string):Promise<void>;
@@ -107,3 +143,5 @@ export function TermResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 export function Terminate(arg1:Array<string>):Promise<store.ActionReport>;
 
 export function TestContext(arg1:config.Context):Promise<string>;
+
+export function WorkflowAction(arg1:string,arg2:string):Promise<string>;

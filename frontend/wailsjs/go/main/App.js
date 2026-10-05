@@ -50,6 +50,10 @@ export function Contexts() {
   return window['go']['main']['App']['Contexts']();
 }
 
+export function CronAction(arg1, arg2) {
+  return window['go']['main']['App']['CronAction'](arg1, arg2);
+}
+
 export function Delete(arg1, arg2) {
   return window['go']['main']['App']['Delete'](arg1, arg2);
 }
@@ -80,6 +84,54 @@ export function History(arg1) {
 
 export function ImportCLI() {
   return window['go']['main']['App']['ImportCLI']();
+}
+
+export function KDelete(arg1) {
+  return window['go']['main']['App']['KDelete'](arg1);
+}
+
+export function KEvents(arg1) {
+  return window['go']['main']['App']['KEvents'](arg1);
+}
+
+export function KObject(arg1) {
+  return window['go']['main']['App']['KObject'](arg1);
+}
+
+export function KObjects() {
+  return window['go']['main']['App']['KObjects']();
+}
+
+export function KPods(arg1) {
+  return window['go']['main']['App']['KPods'](arg1);
+}
+
+export function KSaveYAML(arg1, arg2) {
+  return window['go']['main']['App']['KSaveYAML'](arg1, arg2);
+}
+
+export function KStartLogs(arg1) {
+  return window['go']['main']['App']['KStartLogs'](arg1);
+}
+
+export function KYAML(arg1) {
+  return window['go']['main']['App']['KYAML'](arg1);
+}
+
+export function KubeContexts() {
+  return window['go']['main']['App']['KubeContexts']();
+}
+
+export function KubeReconnect(arg1) {
+  return window['go']['main']['App']['KubeReconnect'](arg1);
+}
+
+export function KubeStatuses() {
+  return window['go']['main']['App']['KubeStatuses']();
+}
+
+export function KubeconfigPaths() {
+  return window['go']['main']['App']['KubeconfigPaths']();
 }
 
 export function LoginPassword(arg1, arg2, arg3, arg4) {
@@ -138,12 +190,20 @@ export function Restart(arg1) {
   return window['go']['main']['App']['Restart'](arg1);
 }
 
+export function RestartPods(arg1) {
+  return window['go']['main']['App']['RestartPods'](arg1);
+}
+
 export function RestartResource(arg1, arg2) {
   return window['go']['main']['App']['RestartResource'](arg1, arg2);
 }
 
 export function Rollback(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['Rollback'](arg1, arg2, arg3, arg4);
+}
+
+export function RolloutAction(arg1, arg2) {
+  return window['go']['main']['App']['RolloutAction'](arg1, arg2);
 }
 
 export function RunAction(arg1, arg2, arg3) {
@@ -160,6 +220,10 @@ export function SaveContext(arg1) {
 
 export function SaveSource(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveSource'](arg1, arg2, arg3);
+}
+
+export function SetKubeContexts(arg1) {
+  return window['go']['main']['App']['SetKubeContexts'](arg1);
 }
 
 export function SetPrefs(arg1) {
@@ -186,6 +250,10 @@ export function StopLogs(arg1) {
   return window['go']['main']['App']['StopLogs'](arg1);
 }
 
+export function SubmitTemplate(arg1, arg2) {
+  return window['go']['main']['App']['SubmitTemplate'](arg1, arg2);
+}
+
 export function Sync(arg1, arg2) {
   return window['go']['main']['App']['Sync'](arg1, arg2);
 }
@@ -208,4 +276,8 @@ export function Terminate(arg1) {
 
 export function TestContext(arg1) {
   return window['go']['main']['App']['TestContext'](arg1);
+}
+
+export function WorkflowAction(arg1, arg2) {
+  return window['go']['main']['App']['WorkflowAction'](arg1, arg2);
 }

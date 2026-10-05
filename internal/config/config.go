@@ -51,6 +51,8 @@ func (c Context) ClientOptions() argocd.Options {
 
 type Prefs struct {
 	Theme string `json:"theme,omitempty"`
+	// kubeconfig contexts enabled for Argo Workflows / Events / Rollouts
+	KubeContexts []string `json:"kubeContexts,omitempty"`
 }
 
 type file struct {
