@@ -285,6 +285,7 @@ export namespace config {
 	export class Prefs {
 	    theme?: string;
 	    kubeContexts?: string[];
+	    noUpdateCheck?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Prefs(source);
@@ -294,6 +295,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
 	        this.kubeContexts = source["kubeContexts"];
+	        this.noUpdateCheck = source["noUpdateCheck"];
 	    }
 	}
 
@@ -1204,6 +1206,54 @@ export namespace store {
 	        this.pod = source["pod"];
 	        this.container = source["container"];
 	    }
+	}
+
+}
+
+export namespace updater {
+	
+	export class Release {
+	    tag: string;
+	    version: string;
+	    url: string;
+	    // Go type: time
+	    publishedAt: any;
+	    notes: string;
+	    assetUrl: string;
+	    assetName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Release(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tag = source["tag"];
+	        this.version = source["version"];
+	        this.url = source["url"];
+	        this.publishedAt = this.convertValues(source["publishedAt"], null);
+	        this.notes = source["notes"];
+	        this.assetUrl = source["assetUrl"];
+	        this.assetName = source["assetName"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

@@ -38,6 +38,10 @@ export function CLIConfigPath() {
   return window['go']['main']['App']['CLIConfigPath']();
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function Clusters() {
   return window['go']['main']['App']['Clusters']();
 }
@@ -276,6 +280,10 @@ export function Terminate(arg1) {
 
 export function TestContext(arg1) {
   return window['go']['main']['App']['TestContext'](arg1);
+}
+
+export function Version() {
+  return window['go']['main']['App']['Version']();
 }
 
 export function WorkflowAction(arg1, arg2) {

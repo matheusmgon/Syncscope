@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -10,6 +11,7 @@ import (
 	"syncscope/internal/kube"
 	"syncscope/internal/kubestore"
 	"syncscope/internal/store"
+	"syncscope/internal/updater"
 )
 
 // App is the surface exposed to the frontend through Wails bindings.
@@ -37,6 +39,7 @@ func (a *App) startup(ctx context.Context) {
 	a.m.Start(ctx)
 	a.k = kubestore.NewManager(a.cfg, func(ev string, data any) { runtime.EventsEmit(ctx, ev, data) })
 	a.k.Start(ctx)
+	go a.updateLoop(ctx)
 }
 
 // ---- contexts ----
@@ -183,3 +186,39 @@ func (a *App) SubmitTemplate(key string, params map[string]string) (string, erro
 }
 func (a *App) CronAction(key, action string) (string, error) { return a.k.CronAction(key, action) }
 func (a *App) RestartPods(key string) (int, error)           { return a.k.RestartPods(key) }
+
+// ---- updates ----
+
+func (a *App) Version() string { return version }
+
+// CheckForUpdate asks GitHub Releases for a newer version (nil when up to date,
+// for dev builds, or when no repository is configured).
+func (a *App) CheckForUpdate() (*updater.Release, error) {
+	if updateRepo == "" {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	return updater.Check(ctx, updateRepo, version)
+}
+
+func (a *App) updateLoop(ctx context.Context) {
+	if updateRepo == "" || a.cfg.Prefs().NoUpdateCheck {
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(10 * time.Second):
+	}
+	for {
+		if rel, err := a.CheckForUpdate(); err == nil && rel != nil {
+			runtime.EventsEmit(ctx, "update:available", rel)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(24 * time.Hour):
+		}
+	}
+}

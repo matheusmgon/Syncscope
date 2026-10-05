@@ -97,7 +97,7 @@ jobs:
 
       - name: wails build
         run: |
-          args=(-clean -trimpath -platform "${{ matrix.platform }}" -ldflags "-s -w -X main.version=${{ steps.v.outputs.tag }}")
+          args=(-clean -trimpath -platform "${{ matrix.platform }}" -ldflags "-s -w -X main.version=${{ steps.v.outputs.tag }} -X main.updateRepo=${{ github.repository }}")
           if [ -n "${{ matrix.tags }}" ]; then args+=(-tags "${{ matrix.tags }}"); fi
           if [ "${{ runner.os }}" = "Windows" ]; then args+=(-nsis); fi
           wails build "${args[@]}"

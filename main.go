@@ -12,6 +12,12 @@ import (
 	"syncscope/internal/config"
 )
 
+// Set at release time: -ldflags "-X main.version=v1.2.3 -X main.updateRepo=owner/repo".
+var (
+	version    = "dev"
+	updateRepo = ""
+)
+
 //go:embed all:frontend/dist
 var assets embed.FS
 
@@ -37,7 +43,7 @@ func main() {
 		Bind:             []interface{}{app},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),
-			About:    &mac.AboutInfo{Title: "Syncscope", Message: "Syncscope for Argo Apps\nDesktop app for Argo CD — Apache-2.0\nNot affiliated with the Argo project."},
+			About:    &mac.AboutInfo{Title: "Syncscope", Message: "Syncscope for Argo Apps " + version + "\nDesktop app for Argo CD — Apache-2.0\nNot affiliated with the Argo project."},
 		},
 	})
 	if err != nil {

@@ -53,6 +53,8 @@ type Prefs struct {
 	Theme string `json:"theme,omitempty"`
 	// kubeconfig contexts enabled for Argo Workflows / Events / Rollouts
 	KubeContexts []string `json:"kubeContexts,omitempty"`
+	// disable the daily GitHub Releases check
+	NoUpdateCheck bool `json:"noUpdateCheck,omitempty"`
 }
 
 type file struct {
