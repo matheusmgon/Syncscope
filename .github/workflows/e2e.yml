@@ -1,0 +1,97 @@
+name: E2E (real Argo CD in kind)
+
+on:
+  workflow_dispatch:
+    inputs:
+      argocd_version:
+        description: 'Argo CD release to test against'
+        required: false
+        default: ''
+  schedule:
+    - cron: '17 4 * * 1' # Mondays 04:17 UTC
+
+permissions:
+  contents: read
+
+env:
+  # Pinned Argo CD release; bump deliberately (or override via workflow_dispatch).
+  ARGOCD_VERSION: ${{ inputs.argocd_version || 'v3.1.0' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: syncscope-e2e
+          wait: 120s
+
+      - name: Install Argo CD ${{ env.ARGOCD_VERSION }}
+        run: |
+          kubectl create namespace argocd
+          # server-side apply: the ApplicationSet CRD is too large for client-side apply annotations
+          kubectl apply -n argocd --server-side --force-conflicts \
+            -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+          kubectl -n argocd rollout status deploy/argocd-server --timeout=5m
+          kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=5m
+          kubectl -n argocd rollout status deploy/argocd-applicationset-controller --timeout=5m
+          kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=5m
+          kubectl -n argocd get pods
+
+      - name: Create Applications and ApplicationSet
+        run: |
+          kubectl apply -n argocd -f scripts/e2e/manifests/
+          # wait for the ApplicationSet to generate its apps (3 plain + 2 generated)
+          for i in $(seq 1 60); do
+            n=$(kubectl -n argocd get applications.argoproj.io -o name | wc -l)
+            [ "$n" -ge 5 ] && break
+            sleep 5
+          done
+          kubectl -n argocd get applications.argoproj.io
+          [ "$(kubectl -n argocd get applications.argoproj.io -o name | wc -l)" -ge 5 ]
+
+      - name: Wait for apps
+        run: |
+          # auto-synced apps become Healthy; the manual "guestbook" just needs a comparison result
+          for app in helm-guestbook kustomize-guestbook guestbook-dev guestbook-staging; do
+            kubectl -n argocd wait "application.argoproj.io/$app" \
+              --for=jsonpath='{.status.health.status}'=Healthy --timeout=8m
+          done
+          kubectl -n argocd wait application.argoproj.io/guestbook \
+            --for=jsonpath='{.status.sync.status}'=OutOfSync --timeout=5m
+
+      - name: Port-forward argocd-server and get admin password
+        run: |
+          kubectl -n argocd port-forward svc/argocd-server 8080:443 > "$RUNNER_TEMP/port-forward.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -ksf https://localhost:8080/api/version >/dev/null && break
+            sleep 2
+          done
+          curl -ksf https://localhost:8080/api/version
+          PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+          echo "::add-mask::$PASS"
+          echo "ARGOCD_E2E_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "ARGOCD_E2E_URL=https://localhost:8080" >> "$GITHUB_ENV"
+
+      - name: Run e2e tests
+        run: go test ./scripts/e2e -count=1 -v -timeout 15m
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n argocd get applications.argoproj.io -o wide || true
+          kubectl -n argocd get applicationsets.argoproj.io -o yaml || true
+          kubectl get pods -A || true
+          kubectl -n argocd logs deploy/argocd-server --tail=200 || true
+          kubectl -n argocd logs statefulset/argocd-application-controller --tail=200 || true
+          kubectl -n argocd logs deploy/argocd-applicationset-controller --tail=200 || true
+          cat "$RUNNER_TEMP/port-forward.log" || true
