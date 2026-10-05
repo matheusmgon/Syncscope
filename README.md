@@ -1,14 +1,16 @@
 <p align="center"><img src="build/appicon.png" width="128" alt="Syncscope icon"></p>
 
-# Syncscope
+# Syncscope for Argo Apps
 
-**A fast, cross-platform desktop app for Argo CD** — every instance and cluster in one
+**A fast, cross-platform desktop app for the Argo tools, starting with Argo CD** — every instance and cluster in one
 place, instant search over thousands of applications, and failures explained instead of
 hidden. Built with Go + Wails + React.
 
 Syncscope aims to cover everything the Argo CD web UI does, plus what it lacks when you
 run ApplicationSets at scale: multi-instance view, problem grouping, bulk operations and
 an offline cache.
+
+Argo CD is supported today; Argo Workflows, Rollouts and Events are on the roadmap.
 
 > Syncscope is an independent project. It is **not affiliated with or endorsed by** the
 > Argo project or the CNCF. Argo and Argo CD are trademarks of The Linux Foundation.

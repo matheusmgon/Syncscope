@@ -282,6 +282,7 @@ export default function App() {
         {!anyCtx && (
           <div className="empty">
             <h3>Welcome to Syncscope</h3>
+            <div className="muted-sm" style={{ marginBottom: 8 }}>Syncscope for Argo Apps</div>
             <p>Add an Argo CD instance or import the contexts you already use with the <code>argocd</code> CLI.</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => setEditCtx('new')}>＋ Add instance</button>
