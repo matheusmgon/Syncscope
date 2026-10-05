@@ -47,6 +47,7 @@ type app struct {
 	NoPrune    bool
 	NoSelfHeal bool
 	Spec       obj // full spec once edited via PUT
+	Annots     map[string]any
 }
 
 func (a *app) spec(cs string) obj {
@@ -139,7 +140,7 @@ func (a *app) toJSON() obj {
 			cs = c["server"].(string)
 		}
 	}
-	meta := obj{"name": a.Name, "namespace": "argocd", "resourceVersion": fmt.Sprint(a.RV),
+	meta := obj{"name": a.Name, "namespace": "argocd", "resourceVersion": fmt.Sprint(a.RV), "annotations": a.Annots,
 		"labels": obj{"team": a.Project, "env": a.Cluster}, "creationTimestamp": "2025-01-10T10:00:00Z"}
 	if a.AppSet != "" {
 		meta["ownerReferences"] = []obj{{"apiVersion": "argoproj.io/v1alpha1", "kind": "ApplicationSet", "name": a.AppSet}}
@@ -315,6 +316,33 @@ func main() {
 	}
 
 	mux.HandleFunc("/api/v1/applications", guard(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var in obj
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			md, _ := in["metadata"].(map[string]any)
+			spec, _ := in["spec"].(map[string]any)
+			name, _ := md["name"].(string)
+			if name == "" || spec == nil {
+				w.WriteHeader(400)
+				writeJSON(w, obj{"message": "application spec is invalid: metadata.name and spec are required"})
+				return
+			}
+			mu.Lock()
+			if _, exists := apps[name]; exists && r.URL.Query().Get("upsert") != "true" {
+				mu.Unlock()
+				w.WriteHeader(409)
+				writeJSON(w, obj{"message": "existing application spec is different, use upsert flag to force update"})
+				return
+			}
+			proj, _ := spec["project"].(string)
+			a := &app{Name: name, Project: proj, Cluster: "in-cluster", NS: name, Repo: "https://github.com/acme/deploy.git", Path: "apps/" + name,
+				Sync: "OutOfSync", Health: "Missing", Phase: "Succeeded", OpMsg: "", Reconciled: time.Now(), Finished: time.Now(), Spec: spec}
+			apps[name] = a
+			mu.Unlock()
+			publish(a, "ADDED")
+			writeJSON(w, a.toJSON())
+			return
+		}
 		mu.RLock()
 		items := make([]obj, 0, len(apps))
 		for _, a := range apps {
@@ -444,12 +472,25 @@ func main() {
 			var b struct{ Patch string }
 			_ = json.NewDecoder(r.Body).Decode(&b)
 			var p struct {
+				Metadata struct {
+					Annotations map[string]any `json:"annotations"`
+				} `json:"metadata"`
 				Spec struct {
 					SyncPolicy map[string]json.RawMessage `json:"syncPolicy"`
 				} `json:"spec"`
 			}
 			_ = json.Unmarshal([]byte(b.Patch), &p)
 			mu.Lock()
+			for k, v := range p.Metadata.Annotations {
+				if a.Annots == nil {
+					a.Annots = map[string]any{}
+				}
+				if v == nil {
+					delete(a.Annots, k)
+				} else {
+					a.Annots[k] = v
+				}
+			}
 			if raw, ok := p.Spec.SyncPolicy["automated"]; ok {
 				if string(raw) == "null" {
 					a.Manual = true
@@ -484,6 +525,13 @@ func main() {
 			mu.Unlock()
 			publish(a, "MODIFIED")
 			writeJSON(w, a.toJSON())
+		case sub == "syncwindows":
+			win := obj{"kind": "deny", "schedule": "0 22 * * *", "duration": "8h", "applications": []string{"*"}, "manualSync": true, "timeZone": "Europe/Zurich"}
+			out := obj{"assignedWindows": []obj{win}, "activeWindows": []obj{}, "canSync": true}
+			if a.Project == "billing" {
+				out["activeWindows"], out["canSync"] = []obj{win}, false
+			}
+			writeJSON(w, out)
 		case sub == "managed-resources":
 			img := "ghcr.io/acme/app:v2.3.1"
 			liveImg := img
@@ -738,7 +786,47 @@ func main() {
 			"syncPolicy": obj{"preserveResourcesOnDeletion": name == "billing"},
 		}, "status": obj{"conditions": conds}})
 	}))
+	mux.HandleFunc("/api/v1/repositories/", guard(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, obj{}) }))
+	mux.HandleFunc("/api/v1/projects/", guard(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1/projects/")
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, obj{"metadata": obj{"name": name, "namespace": "argocd", "resourceVersion": "42"}, "spec": obj{"description": "Team " + name,
+				"sourceRepos": []string{"https://github.com/acme/*"}, "destinations": []obj{{"server": "*", "namespace": name + "-*"}},
+				"syncWindows": []obj{{"kind": "deny", "schedule": "0 22 * * *", "duration": "8h", "applications": []string{"*"}, "manualSync": true}}}})
+		case http.MethodPut:
+			var b struct{ Project obj }
+			_ = json.NewDecoder(r.Body).Decode(&b)
+			if b.Project == nil {
+				w.WriteHeader(400)
+				writeJSON(w, obj{"message": "project is required"})
+				return
+			}
+			writeJSON(w, b.Project)
+		default:
+			writeJSON(w, obj{})
+		}
+	}))
+	mux.HandleFunc("/api/v1/clusters/", guard(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, obj{}) }))
+	mux.HandleFunc("/api/v1/account/", guard(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			writeJSON(w, obj{"token": "eyJhbGciOiJIUzI1NiJ9.mock-api-token"})
+			return
+		}
+		writeJSON(w, obj{})
+	}))
 	mux.HandleFunc("/api/v1/repositories", guard(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var in map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			if repo, _ := in["repo"].(string); !strings.HasPrefix(repo, "https://") && !strings.HasPrefix(repo, "git@") {
+				w.WriteHeader(400)
+				writeJSON(w, obj{"message": "rpc error: code = InvalidArgument desc = repository URL must start with https:// or git@"})
+				return
+			}
+			writeJSON(w, in)
+			return
+		}
 		writeJSON(w, obj{"items": []obj{
 			{"repo": "https://github.com/acme/deploy.git", "type": "git", "project": "", "connectionState": obj{"status": "Successful"}},
 			{"repo": "https://charts.bitnami.com/bitnami", "type": "helm", "name": "bitnami", "connectionState": obj{"status": "Successful"}},
@@ -746,6 +834,10 @@ func main() {
 		}})
 	}))
 	mux.HandleFunc("/api/v1/projects", guard(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			writeJSON(w, obj{})
+			return
+		}
 		items := []obj{}
 		for _, s := range append([]string{"default"}, appsets...) {
 			items = append(items, obj{"metadata": obj{"name": s}, "spec": obj{"description": "Team " + s,

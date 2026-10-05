@@ -82,6 +82,12 @@ export function ResourcePanel({ appKey, node, tab, setTab, selfHeal, onClose, no
     }
   }
 
+  const syncThis = async () => {
+    setMenu(false)
+    const rep = await API.Sync([appKey], argocd.SyncOptions.createFrom({ resources: [{ group: node.group, kind: node.kind, name: node.name, namespace: node.namespace }] }))
+    notify(rep.failed ? `Sync failed: ${rep.results[0]?.error}` : `Sync of ${node.kind}/${node.name} started`, !rep.failed)
+  }
+
   const loadYaml = useCallback(() => API.ResourceYAML(appKey, ref(node)), [appKey, node])
   const saveYaml = useCallback((y: string) => API.PatchResourceYAML(appKey, ref(node), y), [appKey, node])
   const loadEvents = useCallback(() => API.ResourceEvents(appKey, ref(node), node.uid ?? ''), [appKey, node])
@@ -107,6 +113,7 @@ export function ResourcePanel({ appKey, node, tab, setTab, selfHeal, onClose, no
               ))}
               {actions?.length === 0 && <div className="menu-item muted-sm">no actions for {node.kind}</div>}
               <div className="menu-sep" />
+              {node.managed && <div className="menu-item" style={{ textTransform: 'none' }} onClick={syncThis}>⟳ Sync only this resource</div>}
               <div className="menu-item danger" onClick={() => { setMenu(false); setConfirmDel(true) }}>🗑 Delete resource…</div>
             </div>
           )}

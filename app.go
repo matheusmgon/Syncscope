@@ -222,3 +222,36 @@ func (a *App) updateLoop(ctx context.Context) {
 		}
 	}
 }
+
+// ---- Argo CD: creation, sync windows, image updater, configuration ----
+
+func (a *App) NewAppTemplate(ctxID string) string { return a.m.NewAppTemplate(ctxID) }
+func (a *App) CreateApp(ctxID, y string, upsert bool) (string, error) {
+	return a.m.CreateApp(ctxID, y, upsert)
+}
+func (a *App) AppSyncWindows(key string) (*argocd.AppSyncWindows, error) {
+	return a.m.AppSyncWindows(key)
+}
+func (a *App) ImageUpdater(key string) (*store.ImageUpdater, error) { return a.m.ImageUpdater(key) }
+func (a *App) SetImageUpdater(key string, ann map[string]string) error {
+	return a.m.SetImageUpdater(key, ann)
+}
+func (a *App) SaveRepository(ctxID string, r argocd.RepoInput, upsert bool) error {
+	return a.m.SaveRepository(ctxID, r, upsert)
+}
+func (a *App) DeleteRepository(ctxID, repo string) error      { return a.m.DeleteRepository(ctxID, repo) }
+func (a *App) ProjectYAML(ctxID, name string) (string, error) { return a.m.ProjectYAML(ctxID, name) }
+func (a *App) SaveProjectYAML(ctxID, y string, create bool) error {
+	return a.m.SaveProjectYAML(ctxID, y, create)
+}
+func (a *App) DeleteProject(ctxID, name string) error   { return a.m.DeleteProject(ctxID, name) }
+func (a *App) DeleteCluster(ctxID, server string) error { return a.m.DeleteCluster(ctxID, server) }
+func (a *App) UpdateClusterMeta(ctxID, server, name string, labels map[string]string) error {
+	return a.m.UpdateClusterMeta(ctxID, server, name, labels)
+}
+func (a *App) CreateToken(ctxID, account, id string, expiresInSeconds int64) (string, error) {
+	return a.m.CreateToken(ctxID, account, id, expiresInSeconds)
+}
+func (a *App) DeleteToken(ctxID, account, id string) error {
+	return a.m.DeleteToken(ctxID, account, id)
+}

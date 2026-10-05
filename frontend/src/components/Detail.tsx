@@ -4,6 +4,7 @@ import * as API from '../../wailsjs/go/main/App'
 import { getApp, useData } from '../data'
 import { HealthIcon, Pill, SyncIcon, ago } from './Status'
 import { ProblemList } from './Problems'
+import { ConfirmAction } from './Dialogs'
 import { ResourceTree } from './ResourceTree'
 import { HistoryView } from './History'
 import { AppDiff } from './DiffView'
@@ -28,6 +29,9 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
   const [tab, setTab] = useState<DetailTab>('tree')
   const [showProblems, setShowProblems] = useState(true)
   const [policyOpen, setPolicyOpen] = useState(false)
+  const [syncRes, setSyncRes] = useState<store.ResourceRow[] | null>(null)
+  const [windows, setWindows] = useState<argocd.AppSyncWindows | null>(null)
+  useEffect(() => { API.AppSyncWindows(appKey).then(setWindows).catch(() => setWindows(null)) }, [appKey])
   const [diff, setDiff] = useState<store.DiffItem[] | null>(null)
   const guard = useGuard(appKey)
   const loadEvents = useCallback(() => API.AppEvents(appKey), [appKey])
@@ -97,6 +101,11 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
           <div className="tools">
             <Pill kind="health" status={s.health} />
             <span className="pill"><SyncIcon status={s.sync} running={s.opPhase === 'Running'} /> {s.sync}{s.syncRev ? ` · ${s.syncRev}` : ''}</span>
+            {windows && !windows.canSync && (
+              <span className="pill" style={{ borderColor: 'var(--error)', color: 'var(--error-fg)' }} title={(windows.activeWindows ?? []).map((w) => `${w.kind} ${w.schedule} for ${w.duration}`).join('\n')}>
+                ⛔ sync blocked by a sync window{windows.activeWindows?.some((w) => w.manualSync) ? ' (manual sync allowed)' : ''}
+              </span>
+            )}
             <span className="pill clickable" title="Change sync policy" onClick={() => setPolicyOpen(true)}>
               {s.autoSync ? <>auto-sync{d?.prune ? ' · prune' : ''}{d?.selfHeal ? ' · self-heal' : ' · self-heal off'}</> : 'manual sync'} ✎
             </span>
@@ -170,6 +179,26 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
           )}
           {tab === 'history' && <HistoryView appKey={appKey} autoSync={s.autoSync} notify={notify} />}
 
+          {tab === 'summary' && (windows?.assignedWindows?.length ?? 0) > 0 && (
+            <section>
+              <h4>Sync windows</h4>
+              <table className="mini-table">
+                <thead><tr><th>Kind</th><th>Schedule</th><th>Duration</th><th>Manual sync</th><th>Active now</th></tr></thead>
+                <tbody>
+                  {windows!.assignedWindows.map((w, i) => {
+                    const active = (windows!.activeWindows ?? []).some((a) => a.schedule === w.schedule && a.kind === w.kind)
+                    return (
+                      <tr key={i} className={active && w.kind === 'deny' ? 'bad' : ''}>
+                        <td><b>{w.kind}</b></td><td className="mono">{w.schedule} {w.timeZone ?? ''}</td><td>{w.duration}</td>
+                        <td>{w.manualSync ? 'allowed' : 'no'}</td><td>{active ? 'yes' : 'no'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </section>
+          )}
+
           {tab === 'summary' && op && (
             <section>
               <h4>Last operation</h4>
@@ -219,7 +248,7 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
           {tab === 'resources' && <section>
             <h4>Resources {loading && <span style={{ textTransform: 'none' }}>· loading…</span>}</h4>
             {d?.treeError && <div className="alert" style={{ marginBottom: 8 }}>resource-tree: {d.treeError}</div>}
-            <ResourceTable rows={d?.resources ?? []} onRestart={restartOne} />
+            <ResourceTable rows={d?.resources ?? []} onRestart={restartOne} onSyncSelected={setSyncRes} />
           </section>}
 
           {tab === 'resources' && (d?.pods?.length ?? 0) > 0 && (
@@ -277,6 +306,19 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
         </div>
         )}
       </div>
+      {syncRes && (
+        <ConfirmAction
+          kind="sync"
+          names={syncRes.map((r) => `${r.kind}/${r.namespace ? r.namespace + '/' : ''}${r.name}`)}
+          onClose={() => setSyncRes(null)}
+          onRun={async (o) => {
+            const res = syncRes
+            setSyncRes(null)
+            const rep = await API.Sync([appKey], argocd.SyncOptions.createFrom({ ...o, resources: res.map((r) => ({ group: r.group, kind: r.kind, name: r.name, namespace: r.namespace })) }))
+            notify(rep.failed ? `Sync failed: ${rep.results[0]?.error}` : `Sync of ${res.length} resource(s) started`, !rep.failed)
+          }}
+        />
+      )}
       {policyOpen && (
         <SyncPolicyDialog
           keys={[appKey]}
@@ -308,21 +350,29 @@ function Source({ src }: { src: argocd.AppSource }) {
   )
 }
 
-function ResourceTable({ rows, onRestart }: { rows: store.ResourceRow[]; onRestart: (r: store.ResourceRow) => void }) {
+function ResourceTable({ rows, onRestart, onSyncSelected }: { rows: store.ResourceRow[]; onRestart: (r: store.ResourceRow) => void; onSyncSelected: (rows: store.ResourceRow[]) => void }) {
   const [onlyBad, setOnlyBad] = useState(false)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const id = (r: store.ResourceRow) => r.group + '/' + r.kind + '/' + r.namespace + '/' + r.name
   const bad = (r: store.ResourceRow) => r.health === 'Degraded' || r.health === 'Missing' || r.sync === 'OutOfSync'
   const shown = onlyBad ? rows.filter(bad) : [...rows].sort((a, b) => Number(bad(b)) - Number(bad(a)))
   return (
     <>
-      <label className="check" style={{ marginBottom: 6 }}>
-        <input type="checkbox" checked={onlyBad} onChange={(e) => setOnlyBad(e.target.checked)} />
-        only with problems ({rows.filter(bad).length} of {rows.length})
-      </label>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 6 }}>
+        <label className="check">
+          <input type="checkbox" checked={onlyBad} onChange={(e) => setOnlyBad(e.target.checked)} />
+          only with problems ({rows.filter(bad).length} of {rows.length})
+        </label>
+        <span className="spacer" />
+        <button className="btn sm" disabled={!sel.size} onClick={() => onSyncSelected(rows.filter((r) => sel.has(id(r))))}>⟳ Sync selected ({sel.size})</button>
+        <button className="btn sm" onClick={() => setSel(new Set(rows.filter((r) => r.sync === 'OutOfSync').map(id)))}>select OutOfSync</button>
+      </div>
       <table className="mini-table">
-        <thead><tr><th>Kind</th><th>Name</th><th>Sync</th><th>Health</th><th>Message</th><th /></tr></thead>
+        <thead><tr><th /><th>Kind</th><th>Name</th><th>Sync</th><th>Health</th><th>Message</th><th /></tr></thead>
         <tbody>
           {shown.map((r) => (
             <tr key={r.group + r.kind + r.namespace + r.name} className={r.health === 'Degraded' ? 'bad' : ''}>
+              <td><input type="checkbox" checked={sel.has(id(r))} onChange={() => { const s2 = new Set(sel); s2.has(id(r)) ? s2.delete(id(r)) : s2.add(id(r)); setSel(s2) }} /></td>
               <td>{r.kind}</td>
               <td className="mono">{r.namespace ? `${r.namespace}/` : ''}{r.name}{r.prune ? ' (prune)' : ''}</td>
               <td><SyncIcon status={r.sync || 'Unknown'} /></td>

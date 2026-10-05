@@ -38,6 +38,66 @@ export namespace argocd {
 	        this.ref = source["ref"];
 	    }
 	}
+	export class SyncWindow {
+	    kind: string;
+	    schedule: string;
+	    duration: string;
+	    applications?: string[];
+	    namespaces?: string[];
+	    clusters?: string[];
+	    manualSync?: boolean;
+	    timeZone?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncWindow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.schedule = source["schedule"];
+	        this.duration = source["duration"];
+	        this.applications = source["applications"];
+	        this.namespaces = source["namespaces"];
+	        this.clusters = source["clusters"];
+	        this.manualSync = source["manualSync"];
+	        this.timeZone = source["timeZone"];
+	    }
+	}
+	export class AppSyncWindows {
+	    assignedWindows: SyncWindow[];
+	    activeWindows: SyncWindow[];
+	    canSync: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppSyncWindows(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.assignedWindows = this.convertValues(source["assignedWindows"], SyncWindow);
+	        this.activeWindows = this.convertValues(source["activeWindows"], SyncWindow);
+	        this.canSync = source["canSync"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Condition {
 	    type: string;
 	    message: string;
@@ -160,6 +220,34 @@ export namespace argocd {
 		    return a;
 		}
 	}
+	export class RepoInput {
+	    repo: string;
+	    type: string;
+	    name?: string;
+	    project?: string;
+	    username?: string;
+	    password?: string;
+	    sshPrivateKey?: string;
+	    insecure?: boolean;
+	    enableOCI?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RepoInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.repo = source["repo"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.project = source["project"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.sshPrivateKey = source["sshPrivateKey"];
+	        this.insecure = source["insecure"];
+	        this.enableOCI = source["enableOCI"];
+	    }
+	}
 	export class ResourceAction {
 	    Group: string;
 	    Version: string;
@@ -221,11 +309,31 @@ export namespace argocd {
 		    return a;
 		}
 	}
+	export class SyncResource {
+	    group: string;
+	    kind: string;
+	    name: string;
+	    namespace: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncResource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.group = source["group"];
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.namespace = source["namespace"];
+	    }
+	}
 	export class SyncOptions {
 	    prune: boolean;
 	    dryRun: boolean;
 	    force: boolean;
 	    applyOutOfSyncOnly: boolean;
+	    resources?: SyncResource[];
+	    revision?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncOptions(source);
@@ -237,8 +345,30 @@ export namespace argocd {
 	        this.dryRun = source["dryRun"];
 	        this.force = source["force"];
 	        this.applyOutOfSyncOnly = source["applyOutOfSyncOnly"];
+	        this.resources = this.convertValues(source["resources"], SyncResource);
+	        this.revision = source["revision"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
+	
 
 }
 
@@ -1143,6 +1273,20 @@ export namespace store {
 	        this.message = source["message"];
 	        this.metaError = source["metaError"];
 	        this.current = source["current"];
+	    }
+	}
+	export class ImageUpdater {
+	    enabled: boolean;
+	    annotations: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImageUpdater(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.annotations = source["annotations"];
 	    }
 	}
 	export class LogRequest {

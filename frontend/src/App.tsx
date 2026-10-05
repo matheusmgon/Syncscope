@@ -7,6 +7,7 @@ import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { AppSetPage } from './components/AppSetPage'
 import { SyncPolicyDialog } from './components/Parameters'
+import { CreateAppDialog } from './components/CreateApp'
 import { startKData } from './kdata'
 import { KMain, KPageRouter, type Product } from './components/kube/KMain'
 import { AppTable, type GroupBy } from './components/AppTable'
@@ -66,6 +67,7 @@ export default function App() {
   const [appSetPage, setAppSetPage] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bulkPolicy, setBulkPolicy] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [product, setProduct] = useState<Product>(() => load('product', 'cd'))
   const [kctxF, setKctxF] = useState<Set<string>>(new Set())
   const [kq, setKq] = useState<Record<string, string>>({})
@@ -188,7 +190,7 @@ export default function App() {
         }
         return
       }
-      if (product !== 'cd' || kPage || detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
+      if (product !== 'cd' || creating || kPage || detail || appSetPage || settingsOpen || confirm || editCtx || loginCtx || tab !== 'apps') return
       if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setSelected(new Set(filtered.map((a) => a.key)))
@@ -347,6 +349,7 @@ export default function App() {
                 ⚠ Failing only<span className="n">{facet.err}</span>
               </span>
               <span className="spacer" />
+              <button className="btn sm primary" onClick={() => setCreating(true)} title="Create an Argo CD Application">＋ New app</button>
               <div className="seg small" title="View">
                 <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>☰ List</button>
                 <button className={view === 'tiles' ? 'on' : ''} onClick={() => setView('tiles')}>▦ Tiles</button>
@@ -488,6 +491,14 @@ export default function App() {
             setAppSetPage(s ? s.key : `${ctx}|/${name}`)
             setDetail(null)
           }}
+        />
+      )}
+      {creating && (
+        <CreateAppDialog
+          statuses={data.statuses}
+          defaultCtx={ctxF.size === 1 ? [...ctxF][0] : undefined}
+          onClose={() => setCreating(false)}
+          onCreated={(key) => { setCreating(false); notify('Application created', true); setTimeout(() => setDetail(key), 600) }}
         />
       )}
       {bulkPolicy && (

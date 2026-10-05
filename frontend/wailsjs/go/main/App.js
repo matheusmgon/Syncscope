@@ -22,6 +22,10 @@ export function AppSources(arg1) {
   return window['go']['main']['App']['AppSources'](arg1);
 }
 
+export function AppSyncWindows(arg1) {
+  return window['go']['main']['App']['AppSyncWindows'](arg1);
+}
+
 export function AppYAML(arg1) {
   return window['go']['main']['App']['AppYAML'](arg1);
 }
@@ -54,6 +58,14 @@ export function Contexts() {
   return window['go']['main']['App']['Contexts']();
 }
 
+export function CreateApp(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateApp'](arg1, arg2, arg3);
+}
+
+export function CreateToken(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateToken'](arg1, arg2, arg3, arg4);
+}
+
 export function CronAction(arg1, arg2) {
   return window['go']['main']['App']['CronAction'](arg1, arg2);
 }
@@ -66,12 +78,28 @@ export function DeleteAppSet(arg1) {
   return window['go']['main']['App']['DeleteAppSet'](arg1);
 }
 
+export function DeleteCluster(arg1, arg2) {
+  return window['go']['main']['App']['DeleteCluster'](arg1, arg2);
+}
+
 export function DeleteContext(arg1) {
   return window['go']['main']['App']['DeleteContext'](arg1);
 }
 
+export function DeleteProject(arg1, arg2) {
+  return window['go']['main']['App']['DeleteProject'](arg1, arg2);
+}
+
+export function DeleteRepository(arg1, arg2) {
+  return window['go']['main']['App']['DeleteRepository'](arg1, arg2);
+}
+
 export function DeleteResource(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['DeleteResource'](arg1, arg2, arg3, arg4);
+}
+
+export function DeleteToken(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteToken'](arg1, arg2, arg3);
 }
 
 export function Detail(arg1) {
@@ -84,6 +112,10 @@ export function Diff(arg1) {
 
 export function History(arg1) {
   return window['go']['main']['App']['History'](arg1);
+}
+
+export function ImageUpdater(arg1) {
+  return window['go']['main']['App']['ImageUpdater'](arg1);
 }
 
 export function ImportCLI() {
@@ -154,6 +186,10 @@ export function Logout(arg1) {
   return window['go']['main']['App']['Logout'](arg1);
 }
 
+export function NewAppTemplate(arg1) {
+  return window['go']['main']['App']['NewAppTemplate'](arg1);
+}
+
 export function OpenInArgo(arg1) {
   return window['go']['main']['App']['OpenInArgo'](arg1);
 }
@@ -168,6 +204,10 @@ export function PatchResourceYAML(arg1, arg2, arg3) {
 
 export function Prefs() {
   return window['go']['main']['App']['Prefs']();
+}
+
+export function ProjectYAML(arg1, arg2) {
+  return window['go']['main']['App']['ProjectYAML'](arg1, arg2);
 }
 
 export function Reconnect(arg1) {
@@ -222,8 +262,20 @@ export function SaveContext(arg1) {
   return window['go']['main']['App']['SaveContext'](arg1);
 }
 
+export function SaveProjectYAML(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveProjectYAML'](arg1, arg2, arg3);
+}
+
+export function SaveRepository(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveRepository'](arg1, arg2, arg3);
+}
+
 export function SaveSource(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveSource'](arg1, arg2, arg3);
+}
+
+export function SetImageUpdater(arg1, arg2) {
+  return window['go']['main']['App']['SetImageUpdater'](arg1, arg2);
 }
 
 export function SetKubeContexts(arg1) {
@@ -280,6 +332,10 @@ export function Terminate(arg1) {
 
 export function TestContext(arg1) {
   return window['go']['main']['App']['TestContext'](arg1);
+}
+
+export function UpdateClusterMeta(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateClusterMeta'](arg1, arg2, arg3, arg4);
 }
 
 export function Version() {

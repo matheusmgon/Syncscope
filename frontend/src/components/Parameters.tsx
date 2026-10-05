@@ -108,6 +108,7 @@ export function ParametersView({ appKey, notify }: { appKey: string; notify: (m:
       <div className="help" style={{ marginBottom: 10 }}>
         Overrides are stored in the Application spec in Argo CD, not in Git. After saving, sync the app to apply them.
       </div>
+      <ImageUpdaterEditor appKey={appKey} guard={guard} notify={notify} />
       {data.sources.map((s, i) => (
         <SourceEditor
           key={i + ':' + rev}
@@ -250,6 +251,77 @@ function SourceEditor({ index, multi, source, guard, onSave }: { index: number; 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save parameters'}</button>
       </div>
+    </div>
+  )
+}
+
+// ---- Argo CD Image Updater -------------------------------------------------------------
+
+const iuKeys: { key: string; hint: string }[] = [
+  { key: 'image-list', hint: 'alias=registry/image[:constraint], comma separated — enables the updater' },
+  { key: 'write-back-method', hint: 'argocd (default) or git' },
+  { key: 'git-branch', hint: 'branch to commit to when write-back-method is git' },
+  { key: '<alias>.update-strategy', hint: 'semver | newest-build | digest | alphabetical' },
+  { key: '<alias>.allow-tags', hint: 'regexp:^v[0-9.]+$' },
+  { key: '<alias>.ignore-tags', hint: 'latest, dev-*' },
+  { key: '<alias>.helm.image-name', hint: 'Helm parameter for the image repository (e.g. image.repository)' },
+  { key: '<alias>.helm.image-tag', hint: 'Helm parameter for the tag (e.g. image.tag)' },
+  { key: '<alias>.kustomize.image-name', hint: 'image name to override in kustomize' },
+]
+
+function ImageUpdaterEditor({ appKey, guard, notify }: { appKey: string; guard: store.AppSetGuard | null; notify: (m: string, ok: boolean) => void }) {
+  const [rows, setRows] = useState<{ k: string; v: string }[] | null>(null)
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    API.ImageUpdater(appKey).then((iu) => {
+      const r = Object.entries(iu?.annotations ?? {}).map(([k, v]) => ({ k, v }))
+      setRows(r)
+      setOpen(r.length > 0)
+    })
+  }, [appKey])
+  if (!rows) return null
+  const save = async () => {
+    setBusy(true)
+    try {
+      await API.SetImageUpdater(appKey, Object.fromEntries(rows.filter((r) => r.k.trim()).map((r) => [r.k.trim(), r.v])))
+      notify('Image Updater annotations saved', true)
+    } catch (e) {
+      notify(`Saving failed: ${e}`, false)
+    }
+    setBusy(false)
+  }
+  return (
+    <div className="card" style={{ padding: 16, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
+        <b>Argo CD Image Updater</b>
+        <span className="muted-sm">{rows.some((r) => r.k === 'image-list') ? 'enabled' : 'not configured'} · annotations argocd-image-updater.argoproj.io/*</span>
+        <span className="spacer" />
+        <span className="muted-sm">{open ? '▾' : '▸'}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <GuardBanner guard={guard} path="/metadata/annotations" what="these annotations" />
+          <table className="mini-table">
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ width: '40%' }}><input type="text" className="mono inline-input" list="iu-keys" value={r.k} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, k: e.target.value } : x)))} /></td>
+                  <td><input type="text" className="mono inline-input" value={r.v} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)))} /></td>
+                  <td style={{ width: 30 }}><button className="btn sm ghost" onClick={() => setRows(rows.filter((_, j) => j !== i))}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <datalist id="iu-keys">{iuKeys.map((k) => <option key={k.key} value={k.key}>{k.hint}</option>)}</datalist>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button className="btn sm" onClick={() => setRows([...rows, { k: rows.length ? '' : 'image-list', v: '' }])}>＋ Annotation</button>
+            <span className="spacer" />
+            <button className="btn primary sm" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+          </div>
+          <div className="help" style={{ marginTop: 8 }}>{iuKeys.map((k) => <div key={k.key}><code>{k.key}</code> — {k.hint}</div>)}</div>
+        </div>
+      )}
     </div>
   )
 }

@@ -517,6 +517,17 @@ type SyncOptions struct {
 	DryRun             bool `json:"dryRun"`
 	Force              bool `json:"force"`
 	ApplyOutOfSyncOnly bool `json:"applyOutOfSyncOnly"`
+	// Resources limits the sync to these resources (empty = whole app).
+	Resources []SyncResource `json:"resources,omitempty"`
+	// Revision overrides the target revision for this sync only.
+	Revision string `json:"revision,omitempty"`
+}
+
+type SyncResource struct {
+	Group     string `json:"group"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 func (c *Client) Sync(ctx context.Context, name, appNs string, o SyncOptions) error {
@@ -529,6 +540,12 @@ func (c *Client) Sync(ctx context.Context, name, appNs string, o SyncOptions) er
 	}
 	if o.ApplyOutOfSyncOnly {
 		body["syncOptions"] = map[string]any{"items": []string{"ApplyOutOfSyncOnly=true"}}
+	}
+	if len(o.Resources) > 0 {
+		body["resources"] = o.Resources
+	}
+	if o.Revision != "" {
+		body["revision"] = o.Revision
 	}
 	return c.sendJSON(ctx, http.MethodPost, "/api/v1/applications/"+url.PathEscape(name)+"/sync", nil, body, nil)
 }
