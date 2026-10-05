@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"argodeck/internal/argocd"
@@ -35,6 +36,7 @@ type conn struct {
 
 	enrichQ chan string
 	queued  sync.Map
+	dirty   atomic.Bool
 }
 
 func newConn(m *Manager, c config.Context) *conn {
@@ -89,6 +91,7 @@ func (c *conn) stop() {
 
 func (c *conn) run(ctx context.Context) {
 	defer close(c.done)
+	c.loadCache()
 	backoff := time.Second
 	for ctx.Err() == nil {
 		c.setState("connecting", "")
@@ -166,9 +169,11 @@ func (c *conn) syncOnce(ctx context.Context) (bool, error) {
 		c.apps[appKey(c.cfg.ID, a.Metadata.Namespace, a.Metadata.Name)] = a
 	}
 	c.status.Synced = time.Now().Format(time.RFC3339)
+	c.status.CachedAt = ""
 	c.mu.Unlock()
 	c.rebuildAll()
 	c.setState("ok", "")
+	go func() { _ = c.saveCache() }()
 
 	wctx, wcancel := context.WithCancel(ctx)
 	defer wcancel()
@@ -181,6 +186,9 @@ func (c *conn) syncOnce(ctx context.Context) (bool, error) {
 				return
 			case <-t.C:
 				c.refreshAux(wctx, true)
+				if c.dirty.Load() {
+					_ = c.saveCache()
+				}
 			}
 		}
 	}()
@@ -340,6 +348,7 @@ func (c *conn) enrichWorker(ctx context.Context) {
 			}
 			c.mu.Lock()
 			c.enrich[key] = enrichEntry{stamp: enrichStamp(a), problems: treeProblems(tree)}
+			c.dirty.Store(true)
 			cur := c.apps[key]
 			var s AppSummary
 			if cur != nil {
@@ -366,6 +375,7 @@ func (c *conn) onEvent(ev argocd.ApplicationWatchEvent) {
 		c.m.queueDel(key)
 		return
 	}
+	c.dirty.Store(true)
 	c.mu.Lock()
 	c.apps[key] = &a
 	s := summarize(c.cfg.ID, &a, c.clusters, c.enrichFor(key, &a))

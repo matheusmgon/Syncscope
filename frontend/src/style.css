@@ -541,3 +541,44 @@ details summary { cursor: pointer; color: var(--fg-muted); }
 .settings-nav a:hover { color: var(--fg); background: var(--hover); }
 .settings-nav a.on { color: var(--fg); border-left-color: var(--teal); background: var(--hover); }
 .settings-content { flex: 1; overflow: auto; padding: 16px 20px; }
+
+/* ---------- phase 1: panels, menus, diff, terminal, editors ---------- */
+.menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 200px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); padding: 4px 0;
+}
+.menu-item { padding: 7px 14px; cursor: pointer; white-space: nowrap; text-transform: capitalize; }
+.menu-item:hover { background: var(--hover); }
+.menu-item.disabled { opacity: .45; cursor: default; }
+.menu-item.danger { color: var(--error); text-transform: none; }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.panel-scroll { flex: 1; overflow: auto; min-height: 0; padding-bottom: 16px; }
+.rtree-side.logs-mode .panel-scroll { margin: 0 -4px; padding: 0 4px 16px; }
+.term-host { flex: 1; min-height: 0; background: #0b141b; padding: 6px 0 0 8px; }
+.term-host .xterm { height: 100%; }
+.pill.clickable { cursor: pointer; }
+.pill.clickable:hover { border-color: var(--teal); }
+.param-section { border-top: 1px solid var(--border-soft); margin-top: 14px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.param-section h4 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--fg-muted); }
+.inline-input { width: 100%; border: 1px solid var(--border); background: var(--panel-2); border-radius: 3px; padding: 3px 6px; }
+.yaml-editor { display: flex; flex-direction: column; min-height: 0; }
+.yaml-area { width: 100%; min-height: 60vh; resize: vertical; white-space: pre; color: var(--fg); outline: 0; line-height: 1.5; }
+.yaml-area[readonly] { opacity: .92; }
+textarea.code-block { max-height: none; }
+.diff { border: 1px solid var(--border-soft); border-radius: 4px; overflow: auto; font-size: 11.5px; line-height: 1.55; background: var(--panel); }
+.dl { display: flex; white-space: pre; }
+.dl .ln { width: 38px; flex-shrink: 0; text-align: right; padding-right: 6px; color: var(--fg-faint); user-select: none; }
+.dl .sg { width: 16px; flex-shrink: 0; text-align: center; user-select: none; }
+.dl .tx { flex: 1; padding-right: 10px; }
+.dl.k-add { background: rgba(24, 190, 148, .14); }
+.dl.k-add .sg { color: var(--healthy); }
+.dl.k-del { background: rgba(233, 109, 118, .14); }
+.dl.k-del .sg { color: var(--error); }
+.dl.k-gap { color: var(--fg-faint); background: var(--panel-2); padding: 2px 0 2px 60px; font-style: italic; }
+.dl-key { display: inline-block; width: 16px; text-align: center; border-radius: 3px; margin-left: 8px; }
+.dl-key.add { background: rgba(24, 190, 148, .25); }
+.dl-key.del { background: rgba(233, 109, 118, .25); }
+.diff-card { margin-bottom: 14px; }
+.diff-head { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
+.diff-head .caret { width: 12px; color: var(--fg-muted); }
+.banner.info { background: var(--teal-soft); color: var(--fg); border-bottom-color: var(--teal); cursor: default; font-weight: 400; }

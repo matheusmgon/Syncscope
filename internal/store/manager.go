@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -26,7 +27,8 @@ type ContextStatus struct {
 	Message  string `json:"message,omitempty"`
 	Version  string `json:"version,omitempty"`
 	User     string `json:"user,omitempty"`
-	Synced   string `json:"synced,omitempty"` // last successful list
+	Synced   string `json:"synced,omitempty"`   // last successful list
+	CachedAt string `json:"cachedAt,omitempty"` // set while showing data loaded from disk
 	// Errors listing secondary objects (usually RBAC); shown in the UI.
 	AppSetsError  string `json:"appSetsError,omitempty"`
 	ClustersError string `json:"clustersError,omitempty"`
@@ -58,7 +60,8 @@ type Manager struct {
 	mu    sync.RWMutex
 	conns map[string]*conn
 
-	logs logStreams
+	logs  logStreams
+	terms termSessions
 
 	pendMu  sync.Mutex
 	pendUp  map[string]AppSummary
@@ -200,6 +203,7 @@ func (m *Manager) DeleteContext(id string) error {
 	}
 	m.mu.Unlock()
 	err := m.cfg.Delete(id)
+	_ = os.Remove(m.cachePath(id))
 	m.emitSnapshot(id, nil)
 	m.emit("appsets", m.AppSets())
 	m.emitStatus()

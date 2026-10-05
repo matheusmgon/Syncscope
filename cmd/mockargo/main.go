@@ -14,6 +14,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,6 +42,35 @@ type app struct {
 	RV                                             int
 	Reconciled                                     time.Time
 	Finished                                       time.Time
+	// spec state editable through the API
+	Manual     bool // auto-sync disabled
+	NoPrune    bool
+	NoSelfHeal bool
+	Spec       obj // full spec once edited via PUT
+}
+
+func (a *app) spec(cs string) obj {
+	if a.Spec != nil {
+		return a.Spec
+	}
+	var src obj
+	switch {
+	case strings.HasPrefix(a.Name, "platform-addons"):
+		src = obj{"repoURL": "https://charts.bitnami.com/bitnami", "chart": "redis", "targetRevision": "19.6.1",
+			"helm": obj{"releaseName": a.Name, "valueFiles": []string{"values-prod.yaml"},
+				"values":     "architecture: standalone\nauth:\n  enabled: true\nmaster:\n  resources:\n    limits:\n      memory: 512Mi\n",
+				"parameters": []obj{{"name": "replica.replicaCount", "value": "2"}, {"name": "image.tag", "value": "7.2.5"}}}}
+	case strings.Contains(a.Name, "-api-"):
+		src = obj{"repoURL": a.Repo, "path": a.Path, "targetRevision": "main",
+			"kustomize": obj{"images": []string{"ghcr.io/acme/app:v2.3.1"}, "namePrefix": ""}}
+	default:
+		src = obj{"repoURL": a.Repo, "path": a.Path, "targetRevision": "main"}
+	}
+	sp := obj{}
+	if !a.Manual {
+		sp["automated"] = obj{"prune": !a.NoPrune, "selfHeal": !a.NoSelfHeal}
+	}
+	return obj{"project": a.Project, "source": src, "destination": obj{"server": cs, "namespace": a.NS}, "syncPolicy": sp}
 }
 
 var (
@@ -128,8 +159,7 @@ func (a *app) toJSON() obj {
 	}
 	return obj{
 		"metadata": meta,
-		"spec": obj{"project": a.Project, "source": obj{"repoURL": a.Repo, "path": a.Path, "targetRevision": "main"},
-			"destination": obj{"server": cs, "namespace": a.NS}, "syncPolicy": obj{"automated": obj{"prune": true, "selfHeal": true}}},
+		"spec":     a.spec(cs),
 		"status": obj{
 			"sync":           obj{"status": a.Sync, "revision": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"},
 			"health":         obj{"status": a.Health},
@@ -201,6 +231,9 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 func authed(r *http.Request) bool {
 	tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if c, err := r.Cookie("argocd.token"); tok == "" && err == nil {
+		tok = c.Value
+	}
 	tokenMu.Lock()
 	defer tokenMu.Unlock()
 	_, ok := tokens[tok]
@@ -362,7 +395,7 @@ func main() {
 		case sub == "resource/actions/v2":
 			var b map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&b)
-			if b["action"] != "restart" {
+			if act := b["action"]; act != "restart" && act != "pause" && act != "resume" {
 				w.WriteHeader(400)
 				writeJSON(w, obj{"message": "unknown action"})
 				return
@@ -407,6 +440,128 @@ func main() {
 					"info": []obj{{"name": "Status Reason", "value": "Running"}, {"name": "Containers", "value": "1/1"}, {"name": "Node", "value": "gke-pool-1-a1b2"}}})
 			}
 			writeJSON(w, obj{"nodes": nodes})
+		case sub == "" && r.Method == http.MethodPatch:
+			var b struct{ Patch string }
+			_ = json.NewDecoder(r.Body).Decode(&b)
+			var p struct {
+				Spec struct {
+					SyncPolicy map[string]json.RawMessage `json:"syncPolicy"`
+				} `json:"spec"`
+			}
+			_ = json.Unmarshal([]byte(b.Patch), &p)
+			mu.Lock()
+			if raw, ok := p.Spec.SyncPolicy["automated"]; ok {
+				if string(raw) == "null" {
+					a.Manual = true
+				} else {
+					var au struct{ Prune, SelfHeal bool }
+					_ = json.Unmarshal(raw, &au)
+					a.Manual, a.NoPrune, a.NoSelfHeal = false, !au.Prune, !au.SelfHeal
+				}
+				a.Spec = nil
+			}
+			mu.Unlock()
+			publish(a, "MODIFIED")
+			writeJSON(w, a.toJSON())
+		case sub == "" && r.Method == http.MethodPut:
+			var full obj
+			_ = json.NewDecoder(r.Body).Decode(&full)
+			spec, _ := full["spec"].(map[string]any)
+			if spec == nil {
+				w.WriteHeader(400)
+				writeJSON(w, obj{"message": "spec is required"})
+				return
+			}
+			if src, ok := spec["source"].(map[string]any); ok {
+				if rev, _ := src["targetRevision"].(string); rev == "does-not-exist" {
+					w.WriteHeader(400)
+					writeJSON(w, obj{"message": "application spec for " + a.Name + " is invalid: InvalidSpecError: Unable to resolve 'does-not-exist' to a commit SHA"})
+					return
+				}
+			}
+			mu.Lock()
+			a.Spec = spec
+			mu.Unlock()
+			publish(a, "MODIFIED")
+			writeJSON(w, a.toJSON())
+		case sub == "managed-resources":
+			img := "ghcr.io/acme/app:v2.3.1"
+			liveImg := img
+			replicas := 2
+			if a.Sync == "OutOfSync" {
+				liveImg = "ghcr.io/acme/app:v2.2.0"
+			}
+			dep := func(image string, rep int, live bool) string {
+				m := obj{"apiVersion": "apps/v1", "kind": "Deployment", "metadata": obj{"name": "app", "namespace": a.NS, "labels": obj{"app": "app"}},
+					"spec": obj{"replicas": rep, "selector": obj{"matchLabels": obj{"app": "app"}},
+						"template": obj{"metadata": obj{"labels": obj{"app": "app"}}, "spec": obj{"containers": []obj{{"name": "app", "image": image,
+							"resources": obj{"limits": obj{"memory": "512Mi"}}, "ports": []obj{{"containerPort": 8080}}}}}}}}
+				if live {
+					m["metadata"].(obj)["managedFields"] = []obj{{"manager": "argocd-controller"}}
+					m["status"] = obj{"replicas": rep, "readyReplicas": rep}
+				}
+				b, _ := json.Marshal(m)
+				return string(b)
+			}
+			cm := func(level string) string {
+				b, _ := json.Marshal(obj{"apiVersion": "v1", "kind": "ConfigMap", "metadata": obj{"name": "app-config", "namespace": a.NS},
+					"data": obj{"LOG_LEVEL": level, "FEATURE_X": "true"}})
+				return string(b)
+			}
+			liveLevel := "info"
+			if a.Sync == "OutOfSync" {
+				liveLevel = "debug"
+			}
+			svc, _ := json.Marshal(obj{"apiVersion": "v1", "kind": "Service", "metadata": obj{"name": "app", "namespace": a.NS}, "spec": obj{"ports": []obj{{"port": 80, "targetPort": 8080}}}})
+			writeJSON(w, obj{"items": []obj{
+				{"group": "apps", "kind": "Deployment", "namespace": a.NS, "name": "app", "liveState": dep(liveImg, replicas, true), "targetState": dep(img, replicas, false),
+					"normalizedLiveState": dep(liveImg, replicas, false), "predictedLiveState": dep(img, replicas, false), "modified": liveImg != img},
+				{"kind": "ConfigMap", "namespace": a.NS, "name": "app-config", "liveState": cm(liveLevel), "targetState": cm("info"),
+					"normalizedLiveState": cm(liveLevel), "predictedLiveState": cm("info"), "modified": liveLevel != "info"},
+				{"kind": "Service", "namespace": a.NS, "name": "app", "liveState": string(svc), "targetState": string(svc), "normalizedLiveState": string(svc), "predictedLiveState": string(svc)},
+			}})
+		case sub == "events":
+			q := r.URL.Query()
+			now := time.Now()
+			ev := func(typ, reason, msg, kind, name string, count int, ago time.Duration) obj {
+				return obj{"type": typ, "reason": reason, "message": msg, "count": count,
+					"firstTimestamp": now.Add(-ago * 3).Format(time.RFC3339), "lastTimestamp": now.Add(-ago).Format(time.RFC3339),
+					"involvedObject": obj{"kind": kind, "name": name, "namespace": a.NS}, "source": obj{"component": "kubelet"}}
+			}
+			items := []obj{
+				ev("Normal", "ScalingReplicaSet", "Scaled up replica set app-7d9f8b6c5d to 2", "Deployment", "app", 1, 40*time.Minute),
+				ev("Normal", "Pulled", "Container image \"ghcr.io/acme/app:v2.3.1\" already present on machine", "Pod", "app-7d9f8b6c5d-ab10c", 1, 39*time.Minute),
+				ev("Normal", "ResourceUpdated", "Updated sync status: OutOfSync -> Synced", "Application", a.Name, 3, 20*time.Minute),
+			}
+			if len(a.Degraded) > 0 {
+				pod := a.Degraded[0]["name"].(string)
+				items = append(items,
+					ev("Warning", "BackOff", "Back-off restarting failed container app in pod "+pod, "Pod", pod, 17, 2*time.Minute),
+					ev("Warning", "Unhealthy", "Readiness probe failed: HTTP probe failed with statuscode: 503", "Pod", pod, 42, time.Minute))
+			}
+			if rn := q.Get("resourceName"); rn != "" {
+				var f []obj
+				for _, e := range items {
+					if e["involvedObject"].(obj)["name"] == rn {
+						f = append(f, e)
+					}
+				}
+				items = f
+			}
+			writeJSON(w, obj{"items": items})
+		case sub == "resource/actions" && r.Method == http.MethodGet:
+			acts := []obj{}
+			switch r.URL.Query().Get("kind") {
+			case "Deployment":
+				acts = []obj{{"name": "restart", "disabled": false}, {"name": "pause", "disabled": false}, {"name": "resume", "disabled": true}}
+			case "StatefulSet", "DaemonSet":
+				acts = []obj{{"name": "restart", "disabled": false}}
+			}
+			writeJSON(w, obj{"actions": acts})
+		case sub == "resource" && r.Method == http.MethodDelete:
+			writeJSON(w, obj{})
+		case sub == "resource" && r.Method == http.MethodPost:
+			writeJSON(w, obj{"manifest": "{}"})
 		case sub == "" && r.Method == http.MethodDelete:
 			mu.Lock()
 			delete(apps, a.Name)
@@ -501,6 +656,65 @@ func main() {
 			items = append(items, obj{"metadata": obj{"name": s, "namespace": "argocd"}, "status": st})
 		}
 		writeJSON(w, obj{"items": items})
+	}))
+	// Fake web terminal speaking the Argo CD protocol: {"operation":"stdin|resize|stdout","data":...}
+	up := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	mux.HandleFunc("/terminal", guard(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("container") == "istio-proxy" {
+			w.WriteHeader(400)
+			writeJSON(w, obj{"message": "no shell found in container istio-proxy (tried bash, sh)"})
+			return
+		}
+		c, err := up.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		out := func(s string) { _ = c.WriteJSON(obj{"operation": "stdout", "data": s}) }
+		prompt := q.Get("pod") + ":/app$ "
+		out("\x1b[32mConnected to " + q.Get("namespace") + "/" + q.Get("pod") + " (" + q.Get("container") + ")\x1b[0m\r\n" + prompt)
+		line := ""
+		for {
+			var m struct{ Operation, Data string }
+			if err := c.ReadJSON(&m); err != nil {
+				return
+			}
+			if m.Operation != "stdin" {
+				continue
+			}
+			for _, ch := range m.Data {
+				switch ch {
+				case '\r':
+					cmd := strings.TrimSpace(line)
+					line = ""
+					out("\r\n")
+					switch {
+					case cmd == "":
+					case cmd == "exit":
+						out("logout\r\n")
+						return
+					case cmd == "ls":
+						out("app  config  healthcheck.sh  migrations\r\n")
+					case cmd == "whoami":
+						out("app\r\n")
+					case cmd == "env":
+						out("HOSTNAME=" + q.Get("pod") + "\r\nLOG_LEVEL=info\r\nPORT=8080\r\n")
+					default:
+						out("sh: " + strings.Fields(cmd)[0] + ": not found\r\n")
+					}
+					out(prompt)
+				case 127, '\b':
+					if len(line) > 0 {
+						line = line[:len(line)-1]
+						out("\b \b")
+					}
+				default:
+					line += string(ch)
+					out(string(ch))
+				}
+			}
+		}
 	}))
 	mux.HandleFunc("/api/v1/applicationsets/", guard(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/api/v1/applicationsets/")

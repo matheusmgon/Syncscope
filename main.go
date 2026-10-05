@@ -33,6 +33,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 15, G: 39, B: 51, A: 1},
 		OnStartup:        app.startup,
+		OnShutdown:       app.shutdown,
 		Bind:             []interface{}{app},
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),

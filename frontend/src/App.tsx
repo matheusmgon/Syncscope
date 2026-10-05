@@ -6,6 +6,7 @@ import { filterApps, matchText, problemText, sortApps, type SortKey } from './se
 import { SIDEBAR_DEFAULT, Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { AppSetPage } from './components/AppSetPage'
+import { SyncPolicyDialog } from './components/Parameters'
 import { AppTable, type GroupBy } from './components/AppTable'
 import { AppTiles } from './components/AppTiles'
 import { Detail } from './components/Detail'
@@ -62,6 +63,7 @@ export default function App() {
   const [detail, setDetail] = useState<string | null>(null)
   const [appSetPage, setAppSetPage] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [bulkPolicy, setBulkPolicy] = useState(false)
   const [contexts, setContexts] = useState<config.Context[]>([])
   const [editCtx, setEditCtx] = useState<config.Context | 'new' | null>(null)
   const [loginCtx, setLoginCtx] = useState<config.Context | null>(null)
@@ -290,6 +292,14 @@ export default function App() {
 
         {anyCtx && tab === 'apps' && (
           <>
+            {data.statuses.some((s) => s.cachedAt && s.state !== 'ok') && (
+              <div className="banner info">
+                <span>
+                  ⟳ Showing cached data for {data.statuses.filter((s) => s.cachedAt && s.state !== 'ok').map((s) => s.name).join(', ')} while
+                  {data.statuses.some((s) => s.cachedAt && s.state === 'auth') ? ' waiting for login' : ' refreshing from Argo CD'}…
+                </span>
+              </div>
+            )}
             {problemCount > 0 && (
               <div className="banner" onClick={() => setTab('problems')}>
                 <span>⚠ {errApps.length} {errApps.length === 1 ? 'failing application' : 'failing applications'}
@@ -343,6 +353,7 @@ export default function App() {
                 <button className="btn" onClick={() => requestAction('hard', sel)}>Hard refresh</button>
                 <button className="btn" onClick={() => requestAction('restart', sel)}>↻ Restart</button>
                 {selApps.some((a) => a.opPhase === 'Running') && <button className="btn danger" onClick={() => requestAction('terminate', selApps.filter((a) => a.opPhase === 'Running').map((a) => a.key))}>■ Terminate</button>}
+                <button className="btn" onClick={() => setBulkPolicy(true)}>Sync policy…</button>
                 <span className="sep" />
                 <button className="btn danger-outline" onClick={() => requestAction('delete', sel)}>🗑 Delete</button>
               </div>
@@ -443,6 +454,19 @@ export default function App() {
             const s = data.appsets.find((x) => x.ctx === ctx && x.name === name)
             setAppSetPage(s ? s.key : `${ctx}|/${name}`)
             setDetail(null)
+          }}
+        />
+      )}
+      {bulkPolicy && (
+        <SyncPolicyDialog
+          keys={sel}
+          initial={{ automated: selApps.every((a) => a.autoSync), prune: false, selfHeal: false }}
+          generatedCount={selApps.filter((a) => a.appSet).length}
+          onClose={() => setBulkPolicy(false)}
+          onApply={async (p) => {
+            setBulkPolicy(false)
+            const rep = await API.SetSyncPolicy(sel, p)
+            setToasts((t) => [{ id: rep.id, kind: 'report' as const, report: rep }, ...t].slice(0, 6))
           }}
         />
       )}

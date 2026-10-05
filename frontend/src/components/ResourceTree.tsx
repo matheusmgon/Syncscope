@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { store } from '../../wailsjs/go/models'
 import { HealthIcon, SyncIcon, ago } from './Status'
-import { LogViewer } from './LogViewer'
+import { ResourcePanel, kindAbbr, type PanelTab } from './ResourcePanel'
 
 // Argo CD-style resource graph: application on the left, owned resources fanning
 // out to the right (Deployment → ReplicaSet → Pod), connected by curved edges.
@@ -12,14 +12,6 @@ const COL_GAP = 70
 const ROW_GAP = 12
 const APP_ID = '__app'
 
-const kindAbbr: Record<string, string> = {
-  Deployment: 'deploy', ReplicaSet: 'rs', Pod: 'pod', Service: 'svc', ConfigMap: 'cm', Secret: 'secret',
-  Ingress: 'ing', StatefulSet: 'sts', DaemonSet: 'ds', Job: 'job', CronJob: 'cj', PersistentVolumeClaim: 'pvc',
-  ServiceAccount: 'sa', Role: 'role', RoleBinding: 'rb', ClusterRole: 'c.role', ClusterRoleBinding: 'crb',
-  HorizontalPodAutoscaler: 'hpa', Endpoints: 'ep', EndpointSlice: 'eps', Namespace: 'ns', NetworkPolicy: 'netpol',
-  PodDisruptionBudget: 'pdb', Rollout: 'rollout', Application: 'app', ApplicationSet: 'appset',
-  CustomResourceDefinition: 'crd', ServiceMonitor: 'sm', Certificate: 'cert', ExternalSecret: 'es',
-}
 
 const kindOrder = [
   'Namespace', 'CustomResourceDefinition', 'ServiceAccount', 'Role', 'ClusterRole', 'RoleBinding', 'ClusterRoleBinding',
@@ -38,39 +30,14 @@ type Placed = { node: store.TreeNode | null; id: string; x: number; y: number; h
 
 type Props = {
   appKey: string
+  selfHeal: boolean
+  notify: (m: string, ok: boolean) => void
   app: { name: string; health: string; sync: string; opPhase?: string; syncRev: string }
   nodes: store.TreeNode[]
-  onRestart: (n: store.TreeNode) => void
 }
 
-export function ResourceTree({ appKey, app, nodes, onRestart }: Props) {
-  const [sideTab, setSideTab] = useState<'details' | 'logs'>('details')
-  const [sideW, setSideW] = useState(() => Number(localStorage.getItem('argodeck.treeSideW')) || 380)
-  const [logsW, setLogsW] = useState(() => Number(localStorage.getItem('argodeck.treeLogsW')) || 720)
-  const startResize = (e: React.MouseEvent) => {
-    e.preventDefault()
-    const x0 = e.clientX
-    const w0 = sideTab === 'logs' ? logsW : sideW
-    document.body.classList.add('resizing')
-    const move = (ev: MouseEvent) => {
-      const w = Math.max(300, Math.min(window.innerWidth - 300, w0 + x0 - ev.clientX))
-      if (sideTab === 'logs') setLogsW(w)
-      else setSideW(w)
-    }
-    const up = () => {
-      document.body.classList.remove('resizing')
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
-  }
-  useEffect(() => {
-    try {
-      localStorage.setItem('argodeck.treeSideW', String(sideW))
-      localStorage.setItem('argodeck.treeLogsW', String(logsW))
-    } catch { /* ignore */ }
-  }, [sideW, logsW])
+export function ResourceTree({ appKey, app, nodes, selfHeal, notify }: Props) {
+  const [sideTab, setSideTab] = useState<PanelTab>('details')
   const [zoom, setZoom] = useState(1)
   const [filter, setFilter] = useState('')
   const [onlyBad, setOnlyBad] = useState(false)
@@ -225,7 +192,7 @@ export function ResourceTree({ appKey, app, nodes, onRestart }: Props) {
                     key={p.id}
                     className={'rnode' + sev + (selected === n.id ? ' selected' : '') + (n.managed ? '' : ' child')}
                     style={{ left: p.x, top: p.y + 10 }}
-                    onClick={(e) => { e.stopPropagation(); setSelected(n.id); if (!n.hasLogs) setSideTab('details') }}
+                    onClick={(e) => { e.stopPropagation(); setSelected(n.id);  }}
                     onDoubleClick={(e) => { e.stopPropagation(); if (n.hasLogs) { setSelected(n.id); setSideTab('logs') } }}
                     title={n.healthMsg || undefined}
                   >
@@ -248,45 +215,15 @@ export function ResourceTree({ appKey, app, nodes, onRestart }: Props) {
           </div>
         </div>
         {sel && (
-          <div className={'rtree-side selectable' + (sideTab === 'logs' && sel.hasLogs ? ' logs-mode' : '')} style={{ width: sideTab === 'logs' && sel.hasLogs ? logsW : sideW }}>
-            <div className="side-resizer" onMouseDown={startResize} title="Drag to resize" />
-            <div className="rtree-side-head">
-              <span className="kicon">{kindAbbr[sel.kind] ?? sel.kind.slice(0, 4).toLowerCase()}</span>
-              <div style={{ minWidth: 0 }}>
-                <div className="rnode-name" style={{ whiteSpace: 'normal', wordBreak: 'break-all' }}>{sel.name}</div>
-                <div className="rnode-kind">{sel.group ? `${sel.group}/` : ''}{sel.version} {sel.kind}</div>
-              </div>
-              <button className="x" onClick={() => setSelected(null)}>✕</button>
-            </div>
-            {sel.hasLogs && (
-              <div className="seg small" style={{ marginBottom: 12 }}>
-                <button className={sideTab === 'details' ? 'on' : ''} onClick={() => setSideTab('details')}>Details</button>
-                <button className={sideTab === 'logs' ? 'on' : ''} onClick={() => setSideTab('logs')}>Logs</button>
-              </div>
-            )}
-            {sideTab === 'logs' && sel.hasLogs ? <LogViewer key={sel.id} appKey={appKey} node={sel} /> : <>
-            {sel.healthMsg && sel.health !== 'Healthy' && (
-              <div className="problem-box" style={{ margin: '0 0 12px' }}>
-                <div className="problem-line error"><span className="tag error">{sel.health}</span><div className="msg">{sel.healthMsg}</div></div>
-              </div>
-            )}
-            <div className="kv">
-              <div className="k">Namespace</div><div className="v">{sel.namespace || '—'}</div>
-              <div className="k">Health</div><div className="v">{sel.health ? <><HealthIcon status={sel.health} /> {sel.health}</> : '—'}</div>
-              {sel.managed && <><div className="k">Sync</div><div className="v"><SyncIcon status={sel.sync || 'Unknown'} /> {sel.sync}{sel.prune ? ' (requires pruning)' : ''}{sel.hook ? ' (hook)' : ''}</div></>}
-              {sel.createdAt && <><div className="k">Created</div><div className="v">{sel.createdAt} ({ago(sel.createdAt)} ago)</div></>}
-              {Object.entries(sel.info ?? {}).map(([k, v]) => (
-                <Fragment key={k}><div className="k">{k}</div><div className="v">{v}</div></Fragment>
-              ))}
-              {(sel.images?.length ?? 0) > 0 && <><div className="k">Images</div><div className="v mono">{sel.images!.join('\n')}</div></>}
-            </div>
-            {sel.restartable && (
-              <div style={{ marginTop: 14 }}>
-                <button className="btn" onClick={() => onRestart(sel)}>↻ Restart {sel.kind}</button>
-              </div>
-            )}
-            </>}
-          </div>
+          <ResourcePanel
+            appKey={appKey}
+            node={sel}
+            tab={sideTab}
+            setTab={setSideTab}
+            selfHeal={selfHeal}
+            onClose={() => setSelected(null)}
+            notify={notify}
+          />
         )}
       </div>
     </div>

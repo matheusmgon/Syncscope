@@ -11,6 +11,7 @@ import (
 // not exist in the cluster (Missing) are included too.
 type TreeNode struct {
 	ID          string            `json:"id"`
+	UID         string            `json:"uid,omitempty"`
 	Group       string            `json:"group"`
 	Version     string            `json:"version"`
 	Kind        string            `json:"kind"`
@@ -59,7 +60,7 @@ func buildTree(a *argocd.Application, t *argocd.ResourceTree) []TreeNode {
 				continue
 			}
 			seen[id] = true
-			tn := TreeNode{ID: id, Group: n.Group, Version: n.Version, Kind: n.Kind, Namespace: n.Namespace, Name: n.Name,
+			tn := TreeNode{ID: id, UID: n.UID, Group: n.Group, Version: n.Version, Kind: n.Kind, Namespace: n.Namespace, Name: n.Name,
 				Images: n.Images, CreatedAt: n.CreatedAt, Restartable: isRestartable(n.Group, n.Kind), HasLogs: HasLogs(n.Kind)}
 			if n.Health != nil {
 				tn.Health, tn.HealthMsg = n.Health.Status, n.Health.Message

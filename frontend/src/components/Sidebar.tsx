@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react'
 import argoLogo from '../assets/argo.svg'
+import { ago } from './Status'
 import { store } from '../../wailsjs/go/models'
 import type { App } from '../data'
 
@@ -152,7 +153,7 @@ export function Sidebar(p: Props) {
                     {!!c?.warn && <span className="warn">● {c.warn}</span>}
                   </>
                 ) : (
-                  <span>{stateLabel[s.state] ?? s.state}{c?.n ? ` · ${c.n} cached apps` : ''}</span>
+                  <span>{stateLabel[s.state] ?? s.state}{c?.n ? ` · ${c.n.toLocaleString('en-US')} cached apps` : ''}{s.cachedAt ? ` (${ago(s.cachedAt)} old)` : ''}</span>
                 )}
               </div>
               {s.state === 'auth' && (

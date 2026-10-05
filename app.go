@@ -21,6 +21,12 @@ func NewApp(cfg *config.Store) *App {
 	return &App{cfg: cfg}
 }
 
+func (a *App) shutdown(ctx context.Context) {
+	if a.m != nil {
+		a.m.SaveCaches()
+	}
+}
+
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.m = store.NewManager(a.cfg, func(ev string, data any) { runtime.EventsEmit(ctx, ev, data) })
@@ -87,6 +93,45 @@ func (a *App) Rollback(key string, id int64, prune, dryRun bool) error {
 func (a *App) AppSetDetail(key string) (*store.AppSetDetail, error) { return a.m.AppSetDetail(key) }
 func (a *App) DeleteAppSet(key string) error                        { return a.m.DeleteAppSet(key) }
 func (a *App) ArgoConfig(ctxID string) (*store.ArgoConfig, error)   { return a.m.ArgoConfig(ctxID) }
+
+// ---- phase 1: operations ----
+
+func (a *App) SetSyncPolicy(keys []string, p store.SyncPolicy) store.ActionReport {
+	return a.m.SetSyncPolicy(keys, p)
+}
+func (a *App) AppSetGuard(key string) (*store.AppSetGuard, error) { return a.m.AppSetGuard(key) }
+func (a *App) Diff(key string) ([]store.DiffItem, error)          { return a.m.Diff(key) }
+func (a *App) AppEvents(key string) ([]store.EventRow, error)     { return a.m.Events(key, nil, "") }
+func (a *App) ResourceEvents(key string, r argocd.ResourceAction, uid string) ([]store.EventRow, error) {
+	return a.m.Events(key, &r, uid)
+}
+func (a *App) ResourceActions(key string, r argocd.ResourceAction) ([]argocd.ActionDef, error) {
+	return a.m.ResourceActions(key, r)
+}
+func (a *App) RunAction(key string, r argocd.ResourceAction, action string) error {
+	return a.m.RunAction(key, r, action)
+}
+func (a *App) ResourceYAML(key string, r argocd.ResourceAction) (string, error) {
+	return a.m.ResourceYAML(key, r)
+}
+func (a *App) PatchResourceYAML(key string, r argocd.ResourceAction, y string) error {
+	return a.m.PatchResourceYAML(key, r, y)
+}
+func (a *App) DeleteResource(key string, r argocd.ResourceAction, force, orphan bool) error {
+	return a.m.DeleteResource(key, r, force, orphan)
+}
+func (a *App) AppYAML(key string) (string, error)               { return a.m.AppYAML(key) }
+func (a *App) SaveAppYAML(key, y string) error                  { return a.m.SaveAppYAML(key, y) }
+func (a *App) AppSources(key string) (*store.AppSources, error) { return a.m.AppSources(key) }
+func (a *App) SaveSource(key string, index int, src map[string]any) error {
+	return a.m.SaveSource(key, index, src)
+}
+func (a *App) StartTerminal(key string, r store.TerminalRequest) (string, error) {
+	return a.m.StartTerminal(key, r)
+}
+func (a *App) TermInput(id, data string) error            { return a.m.TermInput(id, data) }
+func (a *App) TermResize(id string, rows, cols int) error { return a.m.TermResize(id, rows, cols) }
+func (a *App) TermClose(id string)                        { a.m.TermClose(id) }
 
 func (a *App) OpenInArgo(key string) error {
 	u, err := a.m.WebURL(key)

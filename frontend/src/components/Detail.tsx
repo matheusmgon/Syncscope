@@ -6,6 +6,11 @@ import { HealthIcon, Pill, SyncIcon, ago } from './Status'
 import { ProblemList } from './Problems'
 import { ResourceTree } from './ResourceTree'
 import { HistoryView } from './History'
+import { AppDiff } from './DiffView'
+import { EventsView } from './EventsView'
+import { YamlEditor } from './YamlEditor'
+import { GuardBanner, ParametersView, SyncPolicyDialog, useGuard } from './Parameters'
+import { useCallback } from 'react'
 
 type Props = {
   appKey: string
@@ -17,11 +22,17 @@ type Props = {
   onOpenAppSet: (name: string) => void
 }
 
-type DetailTab = 'tree' | 'summary' | 'resources' | 'history'
+type DetailTab = 'tree' | 'summary' | 'resources' | 'diff' | 'events' | 'parameters' | 'manifest' | 'history'
 
 export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpenAppSet }: Props) {
   const [tab, setTab] = useState<DetailTab>('tree')
   const [showProblems, setShowProblems] = useState(true)
+  const [policyOpen, setPolicyOpen] = useState(false)
+  const [diff, setDiff] = useState<store.DiffItem[] | null>(null)
+  const guard = useGuard(appKey)
+  const loadEvents = useCallback(() => API.AppEvents(appKey), [appKey])
+  const loadAppYaml = useCallback(() => API.AppYAML(appKey), [appKey])
+  const saveAppYaml = useCallback((y: string) => API.SaveAppYAML(appKey, y), [appKey])
   const { version } = useData()
   const live = getApp(appKey)
   const [d, setD] = useState<store.AppDetail | null>(null)
@@ -40,11 +51,19 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
     return () => { cancel = true }
   }, [appKey, stamp])
 
+  // diff is fetched when its tab is open, and again whenever the app changes
   useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    if (tab !== 'diff') return
+    let cancel = false
+    API.Diff(appKey).then((x) => !cancel && setDiff(x ?? [])).catch(() => !cancel && setDiff([]))
+    return () => { cancel = true }
+  }, [appKey, tab, stamp])
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && !policyOpen && onClose()
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [onClose])
+  }, [onClose, policyOpen])
 
   const s = live ?? d?.summary
   void version
@@ -78,7 +97,9 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
           <div className="tools">
             <Pill kind="health" status={s.health} />
             <span className="pill"><SyncIcon status={s.sync} running={s.opPhase === 'Running'} /> {s.sync}{s.syncRev ? ` · ${s.syncRev}` : ''}</span>
-            {s.autoSync && <span className="pill">auto-sync{d?.prune ? ' · prune' : ''}{d?.selfHeal ? ' · self-heal' : ''}</span>}
+            <span className="pill clickable" title="Change sync policy" onClick={() => setPolicyOpen(true)}>
+              {s.autoSync ? <>auto-sync{d?.prune ? ' · prune' : ''}{d?.selfHeal ? ' · self-heal' : ' · self-heal off'}</> : 'manual sync'} ✎
+            </span>
             <span className="spacer" />
           </div>
           <div className="tools">
@@ -97,6 +118,12 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
             <div className={'tab' + (tab === 'resources' ? ' active' : '')} onClick={() => setTab('resources')}>
               Resources <span className="badge">{d?.resources?.length ?? 0}</span>
             </div>
+            <div className={'tab' + (tab === 'diff' ? ' active' : '')} onClick={() => setTab('diff')}>
+              Diff {s.sync === 'OutOfSync' && <span className="badge warning">!</span>}
+            </div>
+            <div className={'tab' + (tab === 'events' ? ' active' : '')} onClick={() => setTab('events')}>Events</div>
+            <div className={'tab' + (tab === 'parameters' ? ' active' : '')} onClick={() => setTab('parameters')}>Parameters</div>
+            <div className={'tab' + (tab === 'manifest' ? ' active' : '')} onClick={() => setTab('manifest')}>Manifest</div>
             <div className={'tab' + (tab === 'history' ? ' active' : '')} onClick={() => setTab('history')}>History &amp; rollback</div>
           </div>
         </header>
@@ -117,9 +144,10 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
             {d ? (
               <ResourceTree
                 appKey={appKey}
+                selfHeal={!!d.selfHeal && s.autoSync}
+                notify={notify}
                 app={s}
                 nodes={d.tree ?? []}
-                onRestart={(n) => restartOne(store.ResourceRow.createFrom({ group: n.group, version: n.version, kind: n.kind, namespace: n.namespace, name: n.name }))}
               />
             ) : (
               <div className="empty">{loading ? 'Loading resource tree…' : 'No data'}</div>
@@ -130,6 +158,16 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
         {tab !== 'tree' && (
         <div className="body selectable">
 
+          {tab === 'diff' && <AppDiff items={diff} />}
+          {tab === 'events' && <EventsView load={loadEvents} />}
+          {tab === 'parameters' && <ParametersView appKey={appKey} notify={notify} />}
+          {tab === 'manifest' && (
+            <YamlEditor
+              load={loadAppYaml}
+              save={saveAppYaml}
+              warning={<GuardBanner guard={guard} path="/spec" what="spec changes" />}
+            />
+          )}
           {tab === 'history' && <HistoryView appKey={appKey} autoSync={s.autoSync} notify={notify} />}
 
           {tab === 'summary' && op && (
@@ -239,6 +277,20 @@ export function Detail({ appKey, ctxName, onClose, onAction, notify, left, onOpe
         </div>
         )}
       </div>
+      {policyOpen && (
+        <SyncPolicyDialog
+          keys={[appKey]}
+          initial={{ automated: s.autoSync, prune: !!d?.prune, selfHeal: !!d?.selfHeal }}
+          generatedCount={s.appSet ? 1 : 0}
+          guard={guard}
+          onClose={() => setPolicyOpen(false)}
+          onApply={async (p) => {
+            setPolicyOpen(false)
+            const rep = await API.SetSyncPolicy([appKey], p)
+            notify(rep.failed ? `Sync policy failed: ${rep.results[0]?.error}` : `Sync policy updated: ${rep.action}`, !rep.failed)
+          }}
+        />
+      )}
     </>
   )
 }

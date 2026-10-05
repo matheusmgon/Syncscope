@@ -1,5 +1,23 @@
 export namespace argocd {
 	
+	export class ActionDef {
+	    name: string;
+	    displayName?: string;
+	    disabled: boolean;
+	    iconClass?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActionDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.disabled = source["disabled"];
+	        this.iconClass = source["iconClass"];
+	    }
+	}
 	export class AppSource {
 	    repoURL: string;
 	    path?: string;
@@ -348,6 +366,7 @@ export namespace store {
 	
 	export class TreeNode {
 	    id: string;
+	    uid?: string;
 	    group: string;
 	    version: string;
 	    kind: string;
@@ -373,6 +392,7 @@ export namespace store {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.uid = source["uid"];
 	        this.group = source["group"];
 	        this.version = source["version"];
 	        this.kind = source["kind"];
@@ -658,7 +678,39 @@ export namespace store {
 		    return a;
 		}
 	}
+	export class AppSetGuard {
+	    appSet: string;
+	    applicationsSync: string;
+	    ignored: string[];
+	    loadError?: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new AppSetGuard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appSet = source["appSet"];
+	        this.applicationsSync = source["applicationsSync"];
+	        this.ignored = source["ignored"];
+	        this.loadError = source["loadError"];
+	    }
+	}
+	
+	export class AppSources {
+	    multi: boolean;
+	    sources: any[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AppSources(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.multi = source["multi"];
+	        this.sources = source["sources"];
+	    }
+	}
 	
 	export class ArgoConfig {
 	    version: string;
@@ -718,6 +770,7 @@ export namespace store {
 	    version?: string;
 	    user?: string;
 	    synced?: string;
+	    cachedAt?: string;
 	    appSetsError?: string;
 	    clustersError?: string;
 	
@@ -738,6 +791,7 @@ export namespace store {
 	        this.version = source["version"];
 	        this.user = source["user"];
 	        this.synced = source["synced"];
+	        this.cachedAt = source["cachedAt"];
 	        this.appSetsError = source["appSetsError"];
 	        this.clustersError = source["clustersError"];
 	    }
@@ -754,6 +808,58 @@ export namespace store {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.cascade = source["cascade"];
 	        this.policy = source["policy"];
+	    }
+	}
+	export class DiffItem {
+	    group: string;
+	    kind: string;
+	    namespace: string;
+	    name: string;
+	    modified: boolean;
+	    hook: boolean;
+	    live: string;
+	    target: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.group = source["group"];
+	        this.kind = source["kind"];
+	        this.namespace = source["namespace"];
+	        this.name = source["name"];
+	        this.modified = source["modified"];
+	        this.hook = source["hook"];
+	        this.live = source["live"];
+	        this.target = source["target"];
+	    }
+	}
+	export class EventRow {
+	    type: string;
+	    reason: string;
+	    message: string;
+	    count: number;
+	    first: string;
+	    last: string;
+	    object: string;
+	    component: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EventRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.reason = source["reason"];
+	        this.message = source["message"];
+	        this.count = source["count"];
+	        this.first = source["first"];
+	        this.last = source["last"];
+	        this.object = source["object"];
+	        this.component = source["component"];
 	    }
 	}
 	export class HistoryEntry {
@@ -820,6 +926,38 @@ export namespace store {
 	}
 	
 	
+	export class SyncPolicy {
+	    automated: boolean;
+	    prune: boolean;
+	    selfHeal: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncPolicy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.automated = source["automated"];
+	        this.prune = source["prune"];
+	        this.selfHeal = source["selfHeal"];
+	    }
+	}
+	export class TerminalRequest {
+	    namespace: string;
+	    pod: string;
+	    container: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TerminalRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.namespace = source["namespace"];
+	        this.pod = source["pod"];
+	        this.container = source["container"];
+	    }
+	}
 
 }
 

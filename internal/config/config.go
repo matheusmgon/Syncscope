@@ -99,6 +99,9 @@ func (s *Store) saveLocked() error {
 	return os.WriteFile(filepath.Join(s.dir, "config.json"), b, 0o600)
 }
 
+// Dir is the directory holding the config (and the app cache).
+func (s *Store) Dir() string { return s.dir }
+
 func (s *Store) Contexts() []Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()

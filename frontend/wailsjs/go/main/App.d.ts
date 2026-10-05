@@ -4,9 +4,17 @@ import {store} from '../models';
 import {argocd} from '../models';
 import {config} from '../models';
 
+export function AppEvents(arg1:string):Promise<Array<store.EventRow>>;
+
 export function AppSetDetail(arg1:string):Promise<store.AppSetDetail>;
 
+export function AppSetGuard(arg1:string):Promise<store.AppSetGuard>;
+
 export function AppSets():Promise<Array<store.AppSetSummary>>;
+
+export function AppSources(arg1:string):Promise<store.AppSources>;
+
+export function AppYAML(arg1:string):Promise<string>;
 
 export function Apps():Promise<Array<store.AppSummary>>;
 
@@ -26,7 +34,11 @@ export function DeleteAppSet(arg1:string):Promise<void>;
 
 export function DeleteContext(arg1:string):Promise<void>;
 
+export function DeleteResource(arg1:string,arg2:argocd.ResourceAction,arg3:boolean,arg4:boolean):Promise<void>;
+
 export function Detail(arg1:string):Promise<store.AppDetail>;
+
+export function Diff(arg1:string):Promise<Array<store.DiffItem>>;
 
 export function History(arg1:string):Promise<Array<store.HistoryEntry>>;
 
@@ -44,11 +56,19 @@ export function OpenInArgo(arg1:string):Promise<void>;
 
 export function OpenURL(arg1:string):Promise<void>;
 
+export function PatchResourceYAML(arg1:string,arg2:argocd.ResourceAction,arg3:string):Promise<void>;
+
 export function Prefs():Promise<config.Prefs>;
 
 export function Reconnect(arg1:string):Promise<void>;
 
 export function Refresh(arg1:Array<string>,arg2:boolean):Promise<store.ActionReport>;
+
+export function ResourceActions(arg1:string,arg2:argocd.ResourceAction):Promise<Array<argocd.ActionDef>>;
+
+export function ResourceEvents(arg1:string,arg2:argocd.ResourceAction,arg3:string):Promise<Array<store.EventRow>>;
+
+export function ResourceYAML(arg1:string,arg2:argocd.ResourceAction):Promise<string>;
 
 export function Restart(arg1:Array<string>):Promise<store.ActionReport>;
 
@@ -56,17 +76,33 @@ export function RestartResource(arg1:string,arg2:argocd.ResourceAction):Promise<
 
 export function Rollback(arg1:string,arg2:number,arg3:boolean,arg4:boolean):Promise<void>;
 
+export function RunAction(arg1:string,arg2:argocd.ResourceAction,arg3:string):Promise<void>;
+
+export function SaveAppYAML(arg1:string,arg2:string):Promise<void>;
+
 export function SaveContext(arg1:config.Context):Promise<config.Context>;
+
+export function SaveSource(arg1:string,arg2:number,arg3:Record<string, any>):Promise<void>;
 
 export function SetPrefs(arg1:config.Prefs):Promise<void>;
 
+export function SetSyncPolicy(arg1:Array<string>,arg2:store.SyncPolicy):Promise<store.ActionReport>;
+
 export function StartLogs(arg1:string,arg2:store.LogRequest):Promise<string>;
+
+export function StartTerminal(arg1:string,arg2:store.TerminalRequest):Promise<string>;
 
 export function Statuses():Promise<Array<store.ContextStatus>>;
 
 export function StopLogs(arg1:string):Promise<void>;
 
 export function Sync(arg1:Array<string>,arg2:argocd.SyncOptions):Promise<store.ActionReport>;
+
+export function TermClose(arg1:string):Promise<void>;
+
+export function TermInput(arg1:string,arg2:string):Promise<void>;
+
+export function TermResize(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function Terminate(arg1:Array<string>):Promise<store.ActionReport>;
 
