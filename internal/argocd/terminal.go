@@ -48,10 +48,14 @@ func (c *Client) OpenTerminal(ctx context.Context, r TerminalRequest) (*Terminal
 	}
 	u.RawQuery = q.Encode()
 
-	var tlsCfg *tls.Config
-	if tr, ok := c.http.Transport.(*http.Transport); ok {
-		tlsCfg = tr.TLSClientConfig
+	// Websockets need HTTP/1.1. The REST transport's TLS config advertises h2
+	// (ALPN), so use a copy restricted to http/1.1 — otherwise servers that
+	// support HTTP/2 (most Argo CD installs) answer with an h2 frame.
+	tlsCfg := &tls.Config{}
+	if tr, ok := c.http.Transport.(*http.Transport); ok && tr.TLSClientConfig != nil {
+		tlsCfg = tr.TLSClientConfig.Clone()
 	}
+	tlsCfg.NextProtos = []string{"http/1.1"}
 	d := websocket.Dialer{TLSClientConfig: tlsCfg, Proxy: http.ProxyFromEnvironment}
 	h := http.Header{}
 	for k, v := range c.opts.Headers {
