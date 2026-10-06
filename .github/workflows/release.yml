@@ -23,15 +23,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS Apple Silicon only
           - os: macos-latest
-            platform: darwin/universal
-            slug: darwin_universal
+            platform: darwin/arm64
+            slug: darwin_arm64
           - os: windows-latest
             platform: windows/amd64
             slug: windows_amd64
+          # Linux needs native builds (cgo + GTK/WebKit), one runner per arch
           - os: ubuntu-24.04
             platform: linux/amd64
             slug: linux_amd64
+            tags: webkit2_41
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+            slug: linux_arm64
             tags: webkit2_41
     runs-on: ${{ matrix.os }}
     defaults:

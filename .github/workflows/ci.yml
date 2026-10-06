@@ -100,6 +100,8 @@ jobs:
             tags: ''
           - os: ubuntu-24.04
             tags: webkit2_41
+          - os: ubuntu-24.04-arm
+            tags: webkit2_41
     runs-on: ${{ matrix.os }}
     defaults:
       run:

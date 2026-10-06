@@ -4,9 +4,10 @@ Releases are built by `.github/workflows/release.yml` when a tag matching `v*`
 is pushed. The workflow:
 
 1. Builds with Wails on three runners:
-   - `darwin/universal` (macos-latest) → `Syncscope_<tag>_darwin_universal.zip` (zipped `.app`)
+   - `darwin/arm64` (macos-latest, Apple Silicon) → `Syncscope_<tag>_darwin_arm64.zip` (zipped `.app`)
    - `windows/amd64` (windows-latest) → `Syncscope_<tag>_windows_amd64_installer.exe` (NSIS) and `Syncscope_<tag>_windows_amd64.zip` (portable `.exe`)
    - `linux/amd64` (ubuntu-24.04, `-tags webkit2_41`) → `Syncscope_<tag>_linux_amd64.tar.gz`
+   - `linux/arm64` (ubuntu-24.04-arm, `-tags webkit2_41`) → `Syncscope_<tag>_linux_arm64.tar.gz`
 2. Stamps the version: `-ldflags "-X main.version=<tag>"` and `info.productVersion`
    in `wails.json` (used for `Info.plist` and the Windows resources; the
    pre-release suffix is dropped there).

@@ -170,14 +170,15 @@ notifications, palette, cache, CI/release pipeline). Next ideas:
 Download the latest build from the GitHub **Releases** page and verify it
 against `SHA256SUMS` (`shasum -a 256 -c SHA256SUMS --ignore-missing`):
 
-- **macOS** (Apple Silicon and Intel): `Syncscope_<version>_darwin_universal.zip`
+- **macOS** (Apple Silicon): `Syncscope_<version>_darwin_arm64.zip`
   — unzip and move `Syncscope.app` to `/Applications`. Release builds are
   signed and notarized when signing is configured; for an unsigned build,
   right-click → *Open* the first time.
 - **Windows**: `Syncscope_<version>_windows_amd64_installer.exe`, or the
   portable `.zip`. Requires the WebView2 runtime (preinstalled on Windows 11;
   the installer fetches it if missing).
-- **Linux** (x86-64): `Syncscope_<version>_linux_amd64.tar.gz`. Needs GTK 3 and
+- **Linux** (x86-64 or ARM64): `Syncscope_<version>_linux_amd64.tar.gz` or
+  `Syncscope_<version>_linux_arm64.tar.gz`. Needs GTK 3 and
   WebKitGTK 4.1 (`sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0`).
 
 Or build from source (see Development).
@@ -198,8 +199,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, commands and conventions.
 ## Releasing
 
 Push a `v*` tag (e.g. `git tag -a v0.2.0 -m v0.2.0 && git push origin v0.2.0`).
-`.github/workflows/release.yml` builds macOS (universal), Windows (NSIS
-installer) and Linux, optionally signs and notarizes the macOS app, writes
+`.github/workflows/release.yml` builds macOS (Apple Silicon), Windows amd64 (NSIS
+installer) and Linux (amd64 and arm64, on native runners), optionally signs and notarizes the macOS app, writes
 `SHA256SUMS` and publishes a GitHub Release. Details and the required signing
 secrets: [docs/RELEASING.md](docs/RELEASING.md).
 
