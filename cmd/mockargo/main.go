@@ -280,6 +280,11 @@ func main() {
 			writeJSON(w, obj{"error": "invalid_request", "error_description": "missing code_verifier"})
 			return
 		}
+		if r.Form.Get("grant_type") == "refresh_token" && r.Form.Get("refresh_token") != "mock-refresh" {
+			w.WriteHeader(400)
+			writeJSON(w, obj{"error": "invalid_grant", "error_description": "Refresh token is invalid or has already been claimed by another client."})
+			return
+		}
 		writeJSON(w, obj{"id_token": issue("dev@acme.io", 2*time.Minute), "refresh_token": "mock-refresh", "token_type": "bearer"})
 	})
 	// --- auth ---

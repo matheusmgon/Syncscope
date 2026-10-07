@@ -153,13 +153,14 @@ func (m *Manager) emitSnapshot(ctxID string, apps []AppSummary) {
 func (m *Manager) emitStatus() { m.emit("ctx:status", m.Statuses()) }
 
 func (m *Manager) startConn(c config.Context) {
-	m.mu.Lock()
-	if old := m.conns[c.ID]; old != nil {
-		old.stop()
-	}
 	cn := newConn(m, c)
+	m.mu.Lock()
+	old := m.conns[c.ID]
 	m.conns[c.ID] = cn
 	m.mu.Unlock()
+	if old != nil {
+		old.stop() // outside the lock: never hold everyone hostage
+	}
 	if !c.Disabled {
 		cn.start()
 	}
@@ -204,11 +205,12 @@ func (m *Manager) SaveContext(c config.Context) (config.Context, error) {
 
 func (m *Manager) DeleteContext(id string) error {
 	m.mu.Lock()
-	if c := m.conns[id]; c != nil {
-		c.stop()
-		delete(m.conns, id)
-	}
+	c := m.conns[id]
+	delete(m.conns, id)
 	m.mu.Unlock()
+	if c != nil {
+		c.stop()
+	}
 	err := m.cfg.Delete(id)
 	_ = os.Remove(m.cachePath(id))
 	m.emitSnapshot(id, nil)

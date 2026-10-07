@@ -30,8 +30,9 @@ func NewApp(cfg *config.Store) *App {
 
 func (a *App) shutdown(ctx context.Context) {
 	if a.m != nil {
-		a.m.SaveCaches()
+		a.m.SaveCaches() // bounded: never blocks quitting for more than a few seconds
 	}
+	runtime.CleanupNotifications(ctx)
 }
 
 func (a *App) startup(ctx context.Context) {

@@ -255,6 +255,30 @@ func (c *Client) getJSON(ctx context.Context, path string, q url.Values, out any
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
+// getPublicJSON calls an unauthenticated endpoint (/api/version,
+// /api/v1/settings). It never touches the credentials: token renewal itself
+// reads /api/v1/settings, so going through do() would re-enter reauth and
+// deadlock on its lock.
+func (c *Client) getPublicJSON(ctx context.Context, path string, out any) error {
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Del("Authorization")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer drain(resp)
+	if resp.StatusCode >= 300 {
+		return readAPIError(resp)
+	}
+	if ct := resp.Header.Get("Content-Type"); strings.Contains(ct, "text/html") {
+		return &APIError{Status: resp.StatusCode, Message: "server answered with HTML instead of JSON — check the URL (root path?) or proxy"}
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
 func (c *Client) sendJSON(ctx context.Context, method, path string, q url.Values, body, out any) error {
 	resp, err := c.do(ctx, c.http, method, path, q, body)
 	if err != nil {
@@ -384,7 +408,7 @@ func (c *Client) Logout() { c.setCredentials(Credentials{}) }
 
 func (c *Client) Version(ctx context.Context) (string, error) {
 	var v Version
-	if err := c.getJSON(ctx, "/api/version", nil, &v); err != nil {
+	if err := c.getPublicJSON(ctx, "/api/version", &v); err != nil {
 		return "", err
 	}
 	return v.Version, nil
@@ -392,7 +416,7 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 
 func (c *Client) Settings(ctx context.Context) (*Settings, error) {
 	var s Settings
-	if err := c.getJSON(ctx, "/api/v1/settings", nil, &s); err != nil {
+	if err := c.getPublicJSON(ctx, "/api/v1/settings", &s); err != nil {
 		return nil, err
 	}
 	return &s, nil

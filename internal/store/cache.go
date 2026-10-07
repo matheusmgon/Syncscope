@@ -130,8 +130,21 @@ func (c *conn) saveCache() error {
 	return os.Rename(tmp, path)
 }
 
-// SaveCaches persists every instance (called on shutdown).
+// SaveCaches persists every instance (called on shutdown). It gives up after a
+// few seconds so quitting the app can never hang on it.
 func (m *Manager) SaveCaches() {
+	done := make(chan struct{})
+	go func() {
+		m.saveCaches()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+	}
+}
+
+func (m *Manager) saveCaches() {
 	m.mu.RLock()
 	conns := make([]*conn, 0, len(m.conns))
 	for _, c := range m.conns {

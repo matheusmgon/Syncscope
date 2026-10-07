@@ -87,10 +87,17 @@ func (c *conn) start() {
 	}
 }
 
+// stop cancels the connection and waits a little for its goroutine. It never
+// blocks for long: a goroutine stuck on a hanging request must not freeze
+// reconnects or quitting the app (it exits on its own once the request fails).
 func (c *conn) stop() {
-	if c.cancel != nil {
-		c.cancel()
-		<-c.done
+	if c.cancel == nil {
+		return
+	}
+	c.cancel()
+	select {
+	case <-c.done:
+	case <-time.After(2 * time.Second):
 	}
 }
 
