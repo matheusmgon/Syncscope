@@ -42,6 +42,10 @@ export function CLIConfigPath() {
   return window['go']['main']['App']['CLIConfigPath']();
 }
 
+export function CancelSSO(arg1) {
+  return window['go']['main']['App']['CancelSSO'](arg1);
+}
+
 export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { argocd, config, kubestore, store } from '../../wailsjs/go/models'
 import * as API from '../../wailsjs/go/main/App'
+import { EventsOn } from '../../wailsjs/runtime/runtime'
 
 function Modal({ title, children, footer, onClose }: { title: string; children: React.ReactNode; footer: React.ReactNode; onClose: () => void }) {
   useEffect(() => {
@@ -180,10 +181,23 @@ export function LoginDialog({ ctx, onClose, onDone }: { ctx: config.Context; onC
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [ssoURL, setSsoURL] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  // the backend publishes the login URL so it can be reopened or copied
+  useEffect(() => EventsOn('sso:url', (p: { id: string; url: string }) => { if (p.id === ctx.id) setSsoURL(p.url) }), [ctx.id])
+  // closing the dialog must stop a pending browser login (it holds the callback port)
+  useEffect(() => () => { API.CancelSSO(ctx.id) }, [ctx.id])
+
+  const cancel = () => {
+    if (busy && mode === 'sso') API.CancelSSO(ctx.id)
+    onClose()
+  }
 
   const go = async () => {
     setBusy(true)
     setErr('')
+    setSsoURL('')
     try {
       if (mode === 'sso') await API.LoginSSO(ctx.id)
       else if (mode === 'password') await API.LoginPassword(ctx.id, user, pass, remember)
@@ -198,12 +212,12 @@ export function LoginDialog({ ctx, onClose, onDone }: { ctx: config.Context; onC
   return (
     <Modal
       title={`Log in to ${ctx.name}`}
-      onClose={onClose}
+      onClose={cancel}
       footer={
         <>
           <button className="btn ghost" onClick={() => API.Logout(ctx.id).then(onDone)}>Logout</button>
           <span className="spacer" />
-          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={cancel}>Cancel</button>
           <button className="btn primary" onClick={go} disabled={busy}>
             {busy ? (mode === 'sso' ? 'Waiting for the browser…' : 'Signing in…') : 'Sign in'}
           </button>
@@ -217,6 +231,15 @@ export function LoginDialog({ ctx, onClose, onDone }: { ctx: config.Context; onC
       </div>
       <div style={{ color: 'var(--fg-muted)' }}>{ctx.server}</div>
       {mode === 'sso' && <div className="help">{authHelp.sso} The callback uses <code>http://localhost:{ctx.ssoPort || 8085}/auth/callback</code>.</div>}
+      {mode === 'sso' && busy && ssoURL && (
+        <div className="alert ok">
+          Finish the login in your browser. Didn't open, or opened in the wrong browser/profile?
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button className="btn sm" onClick={() => API.OpenURL(ssoURL)}>Open again</button>
+            <button className="btn sm" onClick={() => { navigator.clipboard?.writeText(ssoURL); setCopied(true) }}>{copied ? 'Copied ✓' : 'Copy link'}</button>
+          </div>
+        </div>
+      )}
       {mode === 'password' && (
         <form onSubmit={(e) => { e.preventDefault(); go() }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="field"><label>Username</label><input type="text" value={user} onChange={(e) => setUser(e.target.value)} autoFocus /></div>

@@ -64,6 +64,9 @@ type Manager struct {
 	mu    sync.RWMutex
 	conns map[string]*conn
 
+	ssoMu     sync.Mutex
+	ssoCancel map[string]context.CancelFunc
+
 	logs  logStreams
 	terms termSessions
 
@@ -268,21 +271,64 @@ func (m *Manager) Test(c config.Context) (string, error) {
 	return info, nil
 }
 
+// LoginSSO runs the browser login. A previous attempt for the same instance is
+// cancelled first (it would otherwise keep the callback port busy), and the
+// login URL is published as "sso:url" so the UI can offer "open again / copy".
 func (m *Manager) LoginSSO(id string) error {
 	c, err := m.conn(id)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
-	defer cancel()
-	open := m.OpenBrowser
-	if open == nil {
-		open = func(string) {}
+	m.ssoMu.Lock()
+	if m.ssoCancel == nil {
+		m.ssoCancel = map[string]context.CancelFunc{}
 	}
-	if err := c.client.LoginSSO(ctx, c.cfg.SSOPort, !c.cfg.SSONoOffline, open); err != nil {
-		return err
+	if prev := m.ssoCancel[id]; prev != nil {
+		prev()
+	}
+	m.ssoCancel[id] = cancel
+	m.ssoMu.Unlock()
+	defer func() {
+		cancel()
+		m.ssoMu.Lock()
+		delete(m.ssoCancel, id)
+		m.ssoMu.Unlock()
+	}()
+	open := func(u string) {
+		m.emit("sso:url", map[string]any{"id": id, "url": u})
+		if m.OpenBrowser != nil {
+			m.OpenBrowser(u)
+		}
+	}
+	// give a cancelled previous attempt a moment to release the port
+	var lerr error
+	for i := 0; i < 10; i++ {
+		lerr = c.client.LoginSSO(ctx, c.cfg.SSOPort, !c.cfg.SSONoOffline, open)
+		if lerr == nil || !strings.Contains(lerr.Error(), "could not listen") || ctx.Err() != nil {
+			break
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+	if lerr != nil {
+		if errors.Is(lerr, context.Canceled) {
+			return errors.New("login cancelled")
+		}
+		if errors.Is(lerr, context.DeadlineExceeded) {
+			return errors.New("timed out waiting for the browser login")
+		}
+		return lerr
 	}
 	return m.Reconnect(id)
+}
+
+// CancelSSO aborts a browser login in progress and frees the callback port.
+func (m *Manager) CancelSSO(id string) {
+	m.ssoMu.Lock()
+	defer m.ssoMu.Unlock()
+	if cancel := m.ssoCancel[id]; cancel != nil {
+		cancel()
+	}
 }
 
 func (m *Manager) LoginPassword(id, user, pass string, remember bool) error {

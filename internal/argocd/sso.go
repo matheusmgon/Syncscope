@@ -145,9 +145,15 @@ func (c *Client) LoginSSO(ctx context.Context, port int, offlineAccess bool, ope
 		authURL += "?" + q.Encode()
 	}
 
+	// The redirect goes to "localhost", which browsers may resolve to IPv4 or
+	// IPv6: listen on both loopbacks so the callback always arrives.
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return fmt.Errorf("could not listen on localhost:%d for the SSO callback (port in use? close any `argocd login --sso`): %w", port, err)
+	}
+	listeners := []net.Listener{ln}
+	if ln6, err := net.Listen("tcp", fmt.Sprintf("[::1]:%d", port)); err == nil {
+		listeners = append(listeners, ln6)
 	}
 	type result struct {
 		code string
@@ -177,7 +183,9 @@ func (c *Client) LoginSSO(ctx context.Context, port int, offlineAccess bool, ope
 		}
 	})
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	go func() { _ = srv.Serve(ln) }()
+	for _, l := range listeners {
+		go func(l net.Listener) { _ = srv.Serve(l) }(l)
+	}
 	defer func() {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()

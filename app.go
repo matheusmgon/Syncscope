@@ -61,6 +61,7 @@ func (a *App) CLIConfigPath() string         { return config.CLIConfigPath() }
 // ---- auth ----
 
 func (a *App) LoginSSO(id string) error { return a.m.LoginSSO(id) }
+func (a *App) CancelSSO(id string)      { a.m.CancelSSO(id) }
 func (a *App) LoginPassword(id, user, pass string, remember bool) error {
 	return a.m.LoginPassword(id, user, pass, remember)
 }

@@ -27,6 +27,8 @@ export function ArgoConfig(arg1:string):Promise<store.ArgoConfig>;
 
 export function CLIConfigPath():Promise<string>;
 
+export function CancelSSO(arg1:string):Promise<void>;
+
 export function CheckForUpdate():Promise<main.UpdateInfo>;
 
 export function Clusters():Promise<Array<store.ClusterSummary>>;
