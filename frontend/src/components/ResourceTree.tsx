@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { store } from '../../wailsjs/go/models'
 import { HealthIcon, SyncIcon, ago } from './Status'
 import { ResourcePanel, kindAbbr, type PanelTab } from './ResourcePanel'
@@ -121,6 +121,34 @@ export function ResourceTree({ appKey, app, nodes, selfHeal, notify }: Props) {
     return () => el.removeEventListener('wheel', h)
   }, [])
 
+  // drag on empty canvas space pans the view
+  const drag = useRef<{ x: number; y: number; sl: number; st: number; moved: boolean } | null>(null)
+  const [panning, setPanning] = useState(false)
+  const onPanStart = (e: ReactMouseEvent) => {
+    const el = scroller.current
+    if (!el || e.button !== 0 || (e.target as HTMLElement).closest('.rnode, button')) return
+    drag.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop, moved: false }
+    const move = (ev: MouseEvent) => {
+      const d = drag.current
+      if (!d) return
+      const dx = ev.clientX - d.x, dy = ev.clientY - d.y
+      if (!d.moved && Math.abs(dx) + Math.abs(dy) < 4) return
+      if (!d.moved) { d.moved = true; setPanning(true) }
+      el.scrollLeft = d.sl - dx
+      el.scrollTop = d.st - dy
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      setPanning(false)
+      // let the click that follows see the drag, then forget it
+      setTimeout(() => { drag.current = null }, 0)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    e.preventDefault()
+  }
+
   const fit = () => {
     const el = scroller.current
     if (!el) return
@@ -144,7 +172,12 @@ export function ResourceTree({ appKey, app, nodes, selfHeal, notify }: Props) {
         <button className="btn sm" onClick={fit}>Fit</button>
       </div>
       <div className="rtree-main">
-        <div className="rtree-canvas" ref={scroller} onClick={() => setSelected(null)}>
+        <div
+          className={'rtree-canvas' + (panning ? ' panning' : '')}
+          ref={scroller}
+          onMouseDown={onPanStart}
+          onClick={() => { if (!drag.current?.moved) setSelected(null) }}
+        >
           <div style={{ width: layout.width * zoom, height: layout.height * zoom, position: 'relative' }}>
             <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: layout.width, height: layout.height, position: 'absolute' }}>
               <svg width={layout.width} height={layout.height} className="rtree-edges">
